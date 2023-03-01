@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2017 NVIDIA Corporation. All rights reserved.
 
 #ifndef NV_FLEX_EXT_H
 #define NV_FLEX_EXT_H
@@ -44,7 +44,7 @@
 template <typename T>
 struct NvFlexVector
 {
-	NvFlexVector(NvFlexLibrary* l, int size = 0, NvFlexBufferType type = eNvFlexBufferHost) : lib(l), buffer(NULL), mappedPtr(NULL), count(0), capacity(0), type(type)
+	NvFlexVector(NvFlexLibrary* l, int size=0) : lib(l), buffer(NULL), mappedPtr(NULL), count(0), capacity(0)
 	{
 		if (size)
 		{
@@ -55,7 +55,7 @@ struct NvFlexVector
 		}		
 	}
 	
-	NvFlexVector(NvFlexLibrary* l, const T* ptr, int size, NvFlexBufferType type = eNvFlexBufferHost) : lib(l), buffer(NULL), mappedPtr(NULL), count(0), capacity(0), type(type)
+	NvFlexVector(NvFlexLibrary* l, const T* ptr, int size) : lib(l), buffer(NULL), mappedPtr(NULL), count(0), capacity(0)
 	{
 		assign(ptr, size);
 		unmap();
@@ -73,7 +73,6 @@ struct NvFlexVector
 	T* mappedPtr;
 	int count;
 	int capacity;
-	NvFlexBufferType type;
 
 	// reinitialize the vector leaving it unmapped
 	void init(int size)
@@ -178,7 +177,7 @@ struct NvFlexVector
 			// growth factor of 1.5
 			const int newCapacity = minCapacity*3/2;
 
-			NvFlexBuffer* newBuf = NvFlexAllocBuffer(lib, newCapacity, sizeof(T), type);
+			NvFlexBuffer* newBuf = NvFlexAllocBuffer(lib, newCapacity, sizeof(T), eNvFlexBufferHost);
 
 			// copy contents to new buffer			
 			void* newPtr = NvFlexMap(newBuf, eNvFlexMapWait);
@@ -314,6 +313,7 @@ struct NvFlexExtAsset
 	float* particles;				//!< Local space particle positions, x,y,z,1/mass
 	int numParticles;				//!< Number of particles
 	int maxParticles;				//!< Maximum number of particles, allows extra space for tearable assets which duplicate particles
+	float* particleHue;
 
 	// springs
 	int* springIndices;				//!< Spring indices
@@ -328,10 +328,6 @@ struct NvFlexExtAsset
 	float* shapeCoefficients;		//!< The stiffness coefficient for each shape
 	float* shapeCenters;			//!< The position of the center of mass of each shape, an array of vec3s mNumShapes in length
 	int numShapes;					//!< The number of shape matching constraints
-
-	// plastic deformation
-	float* shapePlasticThresholds;	//!< The plastic threshold coefficient for each shape
-	float* shapePlasticCreeps;		//!< The plastic creep coefficient for each shape
 
 	// faces for cloth
 	int* triangleIndices;			//!< Indexed triangle mesh indices for clothing
@@ -362,25 +358,6 @@ struct NvFlexExtInstance
 	const NvFlexExtAsset* asset;	//!< Source asset used to create this instance
 	
 	void* userData;					//!< User data pointer
-};
-
-/**
-* Represents a soft joint with a radius overlapping different flex objects
-* Each soft joint can be spawned into a container using NvFlexExtCreateSoftJoint()
-*/
-struct NvFlexExtSoftJoint
-{
-	int* particleIndices;			//!< Global indices
-	float* particleLocalPositions;  //!< Relative offsets from the particles of the joint to the center
-	int shapeIndex;					//!< Index in the container's shape body constraints array	
-	int numParticles;				//!< Number of particles in the joint
-
-	float shapeTranslations[3];		//!< Joint shape matching group translations (vec3s)
-	float shapeRotations[4];		//!< Joint shape matching group rotations (quaternions)
-
-	float stiffness;				//!< Joint stiffness
-
-	bool initialized;				//!< Joint status flag
 };
 
 /** 
@@ -508,16 +485,14 @@ NV_FLEX_API NvFlexExtAsset* NvFlexExtCreateRigidFromMesh(const float* vertices, 
 * @param[in] volumeSampling Control the resolution the mesh is voxelized at in order to generate interior sampling, if the mesh is not closed then this should be set to zero and surface sampling should be used instead
 * @param[in] surfaceSampling Controls how many samples are taken of the mesh surface, this is useful to ensure fine features of the mesh are represented by particles, or if the mesh is not closed 
 * @param[in] clusterSpacing The spacing for shape-matching clusters, should be at least the particle spacing
-* @param[in] clusterRadius Controls the overall size of the clusters, this controls how much overlap  the clusters have which affects how smooth the final deformation is, if parts of the body are detaching then it means the clusters are not overlapping sufficiently to form a fully connected set of clusters
+* @param[in] clusterRadius Controls the overall size of the clusters, this controls how much overlap the clusters have which affects how smooth the final deformation is, if parts of the body are detaching then it means the clusters are not overlapping sufficiently to form a fully connected set of clusters
 * @param[in] clusterStiffness Controls the stiffness of the resulting clusters
 * @param[in] linkRadius Any particles below this distance will have additional distance constraints created between them
 * @param[in] linkStiffness The stiffness of distance links
 * @param[in] globalStiffness If this parameter is > 0.0f, adds an additional global cluster that consists of all particles in the shape. The stiffness of this cluster is the globalStiffness.
-* @param[in] clusterPlasticThreshold Particles belonging to rigid shapes that move with a position delta magnitude > threshold will be permanently deformed in the rest pose, if clusterPlasticCreep > 0.0f
-* @param[in] clusterPlasticCreep Controls the rate at which particles in the rest pose are deformed for particles passing the deformation threshold
 * @return A pointer to an asset structure holding the particles and constraints
 */
-NV_FLEX_API NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(const float* vertices, int numVertices, const int* indices, int numTriangleIndices, float particleSpacing, float volumeSampling, float surfaceSampling, float clusterSpacing, float clusterRadius, float clusterStiffness, float linkRadius, float linkStiffness, float globalStiffness, float clusterPlasticThreshold, float clusterPlasticCreep);
+NV_FLEX_API NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(const float* vertices, int numVertices, const int* indices, int numTriangleIndices, float particleSpacing, float volumeSampling, float surfaceSampling, float clusterSpacing, float clusterRadius, float clusterStiffness, float linkRadius, float linkStiffness, float globalStiffness);
 
 /**
  * Frees all memory associated with an asset created by one of the creation methods
@@ -668,7 +643,7 @@ NV_FLEX_API NvFlexExtInstance* NvFlexExtCreateInstance(NvFlexExtContainer* conta
 NV_FLEX_API void NvFlexExtDestroyInstance(NvFlexExtContainer* container, const NvFlexExtInstance* instance);
 
 /** Notifies the container that asset data has changed and needs to be sent to the GPU
- *  this should be called if the constraints for an existing asset are modified by the user
+ *  this should be called if the constrains for an existing asset are modified by the user
  *
  * @param[in] container The container the instance referencing the asset belongs to
  * @param[in] asset The asset which was modified (can be NULL)
@@ -786,33 +761,7 @@ NV_FLEX_API void NvFlexExtDestroyForceFieldCallback(NvFlexExtForceFieldCallback*
  */
 NV_FLEX_API void NvFlexExtSetForceFields(NvFlexExtForceFieldCallback* callback, const NvFlexExtForceField* forceFields, int numForceFields);
 
-/**
-* Create a soft joint, the container will internally store a reference to the joint array
-*
-* @param[in] container The container to spawn into
-* @param[in] particleIndices A pointer to an array of particle indices
-* @param[in] particleLocalPositions A pointer to an array of particle local positions
-* @param[in] numJointParticles The number of particles in the joint
-* @param[in] stiffness The stiffness of the joint
-* @return A pointer to the soft joint
-*/
-NV_FLEX_API NvFlexExtSoftJoint* NvFlexExtCreateSoftJoint(NvFlexExtContainer* container, const int* particleIndices, const float* particleLocalPositions, const int numJointParticles, const float stiffness);
 
-/** Destroy a soft joint
-*
-* @param[in] container The container the joint belongs to
-* @param[in] joint The soft joint to destroy
-*/
-NV_FLEX_API void NvFlexExtDestroySoftJoint(NvFlexExtContainer* container, NvFlexExtSoftJoint* joint);
-
-/** Transform all the local particles of the soft joint
-*
-* @param[in] container The container to spawn into
-* @param[in] joint The soft joint to destroy
-* @param[in] position A pointer to a vec3 storing the soft joint new position
-* @param[in] rotation A pointer to a quaternion storing the soft joint new rotation
-*/
-NV_FLEX_API void NvFlexExtSoftJointSetTransform(NvFlexExtContainer* container, NvFlexExtSoftJoint* joint, const float* position, const float* rotation);
 
 } // extern "C"
 

@@ -56,7 +56,7 @@ public:
 		g_params.relaxationFactor = 1.0f;
 		g_params.drag = 0.03f;
 
-		g_params.relaxationMode = eNvFlexRelaxationGlobal;
+		g_params.relaxationMode = eNvFlexRelaxationLocal; //eNvFlexRelaxationGlobal;
 		g_params.relaxationFactor = 0.35f;
 
 		g_numSubsteps = 2;
@@ -66,6 +66,8 @@ public:
 		// draw options		
 		g_drawPoints = false;
 	}
+
+
 
 	void Update()
 	{
@@ -79,15 +81,16 @@ public:
 		const int maxEdits = 2048;
 
 		NvFlexExtTearingParticleClone particleCopies[maxCopies];
-		int numParticleCopies;
+		int numParticleCopies = 0;
 
 		NvFlexExtTearingMeshEdit triangleEdits[maxEdits];
-		int numTriangleEdits;
+		int numTriangleEdits = 0;
 
 		// update asset's copy of the particles
 		memcpy(mCloth->particles, &g_buffers->positions[0], sizeof(Vec4)*g_buffers->positions.size());
 
 		NvFlexExtTearClothMesh(mCloth, maxStrain, 4, particleCopies, &numParticleCopies, maxCopies, triangleEdits, &numTriangleEdits, maxEdits);
+		
 
 		// copy particles
 		for (int i = 0; i < numParticleCopies; ++i)
@@ -123,9 +126,9 @@ public:
 	virtual void Sync()
 	{
 		// update solver data not already updated in the main loop
-		NvFlexSetSprings(g_solver, g_buffers->springIndices.buffer, g_buffers->springLengths.buffer, g_buffers->springStiffness.buffer, g_buffers->springLengths.size());
-		NvFlexSetDynamicTriangles(g_solver, g_buffers->triangles.buffer, g_buffers->triangleNormals.buffer, g_buffers->triangles.size() / 3);
-		NvFlexSetRestParticles(g_solver, g_buffers->restPositions.buffer, NULL);
+		NvFlexSetSprings(g_flex, g_buffers->springIndices.buffer, g_buffers->springLengths.buffer, g_buffers->springStiffness.buffer, g_buffers->springLengths.size());
+		NvFlexSetDynamicTriangles(g_flex, g_buffers->triangles.buffer, g_buffers->triangleNormals.buffer, g_buffers->triangles.size() / 3);
+		NvFlexSetRestParticles(g_flex, g_buffers->restPositions.buffer, g_buffers->restPositions.size());
 	}
 
 	NvFlexExtAsset* mCloth;

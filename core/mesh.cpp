@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #include "mesh.h"
 #include "platform.h"
@@ -141,7 +141,14 @@ Mesh* ImportMesh(const char* path)
 	else if (ext == "obj")
 		mesh = ImportMeshFromObj(path);
 
-
+	for (size_t i = 0; i < mesh->m_positions.size(); i++)
+	{
+		mesh->original_positions.push_back(mesh->m_positions[i]);
+	}
+	for (size_t i = 0; i < mesh->m_normals.size(); i++)
+	{
+		mesh->original_normals.push_back(mesh->m_normals[i]);
+	}
 	return mesh;
 }
 
@@ -661,6 +668,14 @@ void Mesh::Transform(const Matrix44& m)
     }
 }
 
+void Mesh::Transform2(const Matrix44& m) {
+	for (uint32_t i = 0; i < m_positions.size(); ++i)
+	{
+		m_positions[i] = m * original_positions[i];
+		m_normals[i] = m * original_normals[i];
+	}
+}
+
 void Mesh::GetBounds(Vector3& outMinExtents, Vector3& outMaxExtents) const
 {
     Point3 minExtents(FLT_MAX);
@@ -814,7 +829,7 @@ Mesh* CreateDiscMesh(float radius, uint32_t segments)
 
 	Mesh* m = new Mesh();
 	m->m_positions.resize(numVerts);
-	m->m_normals.resize(numVerts, Vec3(0.0f, 1.0f, 0.0f));
+	m->m_normals.resize(numVerts);
 
 	m->m_positions[0] = Point3(0.0f);
 	m->m_positions[1] = Point3(0.0f, 0.0f, radius);
@@ -827,6 +842,7 @@ Mesh* CreateDiscMesh(float radius, uint32_t segments)
 			nextVert = 1;
 		
 		m->m_positions[nextVert] = Point3(radius*Sin((float(i)/segments)*k2Pi), 0.0f, radius*Cos((float(i)/segments)*k2Pi));
+		m->m_normals[nextVert] = Vector3(0.0f, 1.0f, 0.0f);
 
 		m->m_indices.push_back(0);
 		m->m_indices.push_back(i);

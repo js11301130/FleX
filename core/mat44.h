@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -161,6 +161,14 @@ public:
 		columns[3][2] = p.z;
 		columns[3][3] = 1.0f;
 	}
+
+	CUDA_CALLABLE void SetTranslation(float x, float y, float z) {
+		columns[3][0] = x;
+		columns[3][1] = y;
+		columns[3][2] = z;
+		columns[3][3] = 1.0f;
+	}
+
 
 	CUDA_CALLABLE const Vec3& GetAxis(int i) const { return *reinterpret_cast<const Vec3*>(&columns[i]); }
 	CUDA_CALLABLE const Vec4& GetCol(int i) const { return *reinterpret_cast<const Vec4*>(&columns[i]); }

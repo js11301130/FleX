@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -78,6 +78,13 @@ public:
 
 	CUDA_CALLABLE inline bool operator != (const XVector3<T>& v) const { return (x != v.x || y != v.y || z != v.z); }
 
+	CUDA_CALLABLE inline float dist(XVector3 v) {
+		float dx = x - v.x;
+		float dy = y - v.y;
+		float dz = z - v.z;
+		return sqrt(dx * dx + dy * dy + dz * dz);
+	}
+
 	// negate
 	CUDA_CALLABLE inline XVector3<T> operator -() const { VEC3_VALIDATE(); return XVector3<T>(-x, -y, -z); }
 
@@ -117,7 +124,6 @@ CUDA_CALLABLE inline float Dot3(const float* v1, const float * v2)
 {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]; 
 }
-
 
 template <typename T>
 CUDA_CALLABLE inline T Dot(const XVector3<T>& v1, const XVector3<T>& v2)

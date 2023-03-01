@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2017 NVIDIA Corporation. All rights reserved.
 
 #include "core/core.h"
 #include "core/maths.h"
@@ -175,7 +175,7 @@ void NvFlexExtSetForceFields(NvFlexExtForceFieldCallback* c, const NvFlexExtForc
 	if (numForceFields > 0)
 	{
 		// update staging buffer
-		void* dstPtr = c->mContext->map(c->mForceFieldsGpu, NvFlex::eMapWrite);
+		void* dstPtr = c->mContext->mapUpload(c->mForceFieldsGpu);
 		memcpy(dstPtr, forceFields, numForceFields*sizeof(NvFlexExtForceField));
 		c->mContext->unmap(c->mForceFieldsGpu);
 

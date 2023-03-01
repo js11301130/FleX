@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2017 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -93,6 +93,7 @@ public:
 #include "scenes/nonconvex.h"
 #include "scenes/parachutingbunnies.h"
 #include "scenes/pasta.h"
+#include "scenes/plasticstack.h"
 #include "scenes/player.h"
 #include "scenes/potpourri.h"
 #include "scenes/rayleightaylor.h"
@@ -103,7 +104,6 @@ public:
 #include "scenes/rockpool.h"
 #include "scenes/sdfcollision.h"
 #include "scenes/shapecollision.h"
-#include "scenes/shapechannels.h"
 #include "scenes/softbody.h"
 #include "scenes/spherecloth.h"
 #include "scenes/surfacetension.h"

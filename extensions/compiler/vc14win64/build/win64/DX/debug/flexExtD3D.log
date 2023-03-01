@@ -1,0 +1,11 @@
+﻿F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(1,1): error X3000: syntax error: unexpected token '%'
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(4,4082): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(6,163): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(7,35): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(7,55): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(8,408): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(11,16): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(11,320): error X1005: string continues past end of line
+F:\UnityProject\FleX\extensions\dx\flexExt_dx_common.h(12,429): error X1005: string continues past end of line
+  
+  compilation failed; no code produced

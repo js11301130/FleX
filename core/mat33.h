@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -55,6 +55,20 @@ struct Matrix33
 	Vec3 cols[3];
 
 	CUDA_CALLABLE static inline Matrix33 Identity() {  const Matrix33 sIdentity(Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(0.0f, 0.0f, 1.0f)); return sIdentity; }
+
+	CUDA_CALLABLE inline void MatRotate(float x, float y, float z) {
+		cols[0].x = cos(z) * cos(y);
+		cols[0].y = sin(z) * cos(y);
+		cols[0].z = -sin(z);
+
+		cols[1].x = -sin(z) * cos(x) + cos(z) * sin(y) * sin(x);
+		cols[1].y = cos(z) * cos(x) + sin(z) * sin(y) * sin(x);
+		cols[1].z = cos(y) * sin(x);
+
+		cols[2].x = sin(z) * sin(x) + cos(z) * sin(y) * cos(x);
+		cols[2].y = -cos(z) * sin(x) + sin(z) * sin(y) * cos(x);
+		cols[2].z = cos(y) * cos(x);
+	}
 };
 
 CUDA_CALLABLE inline Matrix33 Multiply(float s, const Matrix33& m)

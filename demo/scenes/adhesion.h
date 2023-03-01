@@ -11,9 +11,11 @@ public:
 
 		g_params.radius = radius;
 
+		g_params.fluid = true;
 		g_params.numIterations = 3;
 		g_params.vorticityConfinement = 0.0f;
 		g_params.fluidRestDistance = g_params.radius*0.55f;
+		g_params.anisotropyScale = 3.0f / radius;
 		g_params.smoothing = 0.5f;
 		g_params.relaxationFactor = 1.f;
 		g_params.restitution = 0.0f;

@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2017 NVIDIA Corporation. All rights reserved.
 
 #include "../include/NvFlexExt.h"
 
@@ -262,7 +262,7 @@ void NvFlexExtTearClothMesh(NvFlexExtAsset* asset, float maxStrain, int maxSplit
 
 	int splits = 0;
 
-	maxCopies = Min(maxCopies, tearable->maxParticles-tearable->numParticles);
+	maxCopies = Min(maxCopies, tearable->maxParticles - tearable->numParticles);
 
 	// iterate over all edges and tear if beyond maximum strain
 	for (int i=0; i < tearable->numSprings && int(copies.size()) < maxCopies && splits < maxSplits; ++i)

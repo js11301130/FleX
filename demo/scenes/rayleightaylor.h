@@ -31,9 +31,11 @@ public:
 		g_params.gravity[1] = -9.f;
 		g_params.radius = radius;
 		g_params.dynamicFriction = 0.00f;
+		g_params.fluid = true;
 		g_params.viscosity = 2.0f;
 		g_params.numIterations = 10;
 		g_params.vorticityConfinement = 0.0f;
+		g_params.anisotropyScale = 50.0f;
 		g_params.smoothing = 1.f;
 		g_params.fluidRestDistance = restDistance;
 		g_params.numPlanes = 5;
@@ -107,9 +109,11 @@ public:
 		g_params.gravity[1] = -9.f;
 		g_params.radius = radius;
 		g_params.dynamicFriction = 0.00f;
+		g_params.fluid = true;
 		g_params.viscosity = 0.0f;
 		g_params.numIterations = 10;
 		g_params.vorticityConfinement = 0.0f;
+		g_params.anisotropyScale = 50.0f;
 		g_params.smoothing = 1.f;
 		g_params.fluidRestDistance = restDistance;
 		g_params.numPlanes = 5;

@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -1383,7 +1383,7 @@ CUDA_CALLABLE inline bool PointInTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 p)
 	return true;
 }
 
-CUDA_CALLABLE inline void ClosestPointBetweenLineSegments(const Vec3& p, const Vec3& q, const Vec3& r, const Vec3& s, float& u, float& v)
+inline void ClosestPointBetweenLineSegments(const Vec3& p, const Vec3& q, const Vec3& r, const Vec3& s, float& u, float& v)
 	{
 		Vec3 d1 = q-p;
 		Vec3 d2 = s-r;

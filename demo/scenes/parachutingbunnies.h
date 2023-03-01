@@ -124,6 +124,7 @@ public:
 			}
 		}
 
+		g_params.fluid = true;
 		g_params.radius = 0.1f;
 		g_params.fluidRestDistance = radius;
 		g_params.numIterations = 4;
@@ -137,6 +138,7 @@ public:
 		g_params.drag = 0.06f;
 		g_params.lift = 0.f;
 		g_params.solidPressure = 0.0f;
+		g_params.anisotropyScale = 22.0f;
 		g_params.smoothing = 1.0f;
 		g_params.relaxationFactor = 1.0f;
 		

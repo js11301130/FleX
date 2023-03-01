@@ -19,11 +19,8 @@
 #ifndef IMGUI_RENDER_GL_H
 #define IMGUI_RENDER_GL_H
 
-namespace OGL_Renderer
-{
-	bool imguiRenderGLInit(const char* fontpath);
-	void imguiRenderGLDestroy();
-	void imguiRenderGLDraw();
-}
+bool imguiRenderGLInit(const char* fontpath);
+void imguiRenderGLDestroy();
+void imguiRenderGLDraw();
 
 #endif // IMGUI_RENDER_GL_H

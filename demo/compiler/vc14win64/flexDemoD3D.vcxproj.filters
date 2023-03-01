@@ -108,6 +108,12 @@
 		<ClInclude Include="..\..\scenes\pasta.h">
 			<Filter>demo\scenes</Filter>
 		</ClInclude>
+		<ClInclude Include="..\..\scenes\plasticbody.h">
+			<Filter>demo\scenes</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\scenes\plasticstack.h">
+			<Filter>demo\scenes</Filter>
+		</ClInclude>
 		<ClInclude Include="..\..\scenes\player.h">
 			<Filter>demo\scenes</Filter>
 		</ClInclude>
@@ -118,6 +124,9 @@
 			<Filter>demo\scenes</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\scenes\restitution.h">
+			<Filter>demo\scenes</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\scenes\ridigbody.h">
 			<Filter>demo\scenes</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\scenes\rigidfluidcoupling.h">
@@ -133,9 +142,6 @@
 			<Filter>demo\scenes</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\scenes\sdfcollision.h">
-			<Filter>demo\scenes</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\scenes\shapechannels.h">
 			<Filter>demo\scenes</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\scenes\shapecollision.h">
@@ -176,13 +182,7 @@
 		<ClCompile Include="..\..\main.cpp">
 			<Filter>demo</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\shadersDemoContext.cpp">
-			<Filter>demo</Filter>
-		</ClCompile>
 		<ClInclude Include="..\..\benchmark.h">
-			<Filter>demo</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\demoContext.h">
 			<Filter>demo</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\helpers.h">
@@ -195,9 +195,6 @@
 			<Filter>demo</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\shaders.h">
-			<Filter>demo</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\shadersDemoContext.h">
 			<Filter>demo</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\stb_truetype.h">
@@ -246,9 +243,6 @@
 			<Filter>core</Filter>
 		</ClCompile>
 		<ClCompile Include="..\..\..\core\platform.cpp">
-			<Filter>core</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\..\core\png.cpp">
 			<Filter>core</Filter>
 		</ClCompile>
 		<ClCompile Include="..\..\..\core\sdf.cpp">
@@ -302,9 +296,6 @@
 		<ClInclude Include="..\..\..\core\platform.h">
 			<Filter>core</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\..\core\png.h">
-			<Filter>core</Filter>
-		</ClInclude>
 		<ClInclude Include="..\..\..\core\point3.h">
 			<Filter>core</Filter>
 		</ClInclude>
@@ -312,6 +303,9 @@
 			<Filter>core</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\..\core\sdf.h">
+			<Filter>core</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\core\skylight.h">
 			<Filter>core</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\..\core\tga.h">
@@ -334,183 +328,6 @@
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>
-		<Filter Include="d3d12">
-		</Filter>
-	</ItemGroup>
-	<ItemGroup>
-		<ClInclude Include="..\..\d3d12\appD3D12Ctx.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\bufferD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\demoContextD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\diffusePointRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\fluidCompositeRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\fluidEllipsoidRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\fluidSmoothRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\fluidThicknessRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\imguiGraphD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\lineRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\meshRenderer.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\meshRendererD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\meshRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\meshUtil.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12CircularResourceHeap.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12CounterFence.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12DescriptorHeap.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12Handle.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12HelperUtil.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12RenderTarget.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12Resource.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDx12ResourceScopeManager.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDxDebugUtil.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoDxFormatUtil.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvCoFreeList.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\NvResult.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\pipelineUtilD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\pointRenderPipelineD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d12\renderStateD3D12.h">
-			<Filter>d3d12</Filter>
-		</ClInclude>
-		<ClCompile Include="..\..\d3d12\appD3D12Ctx.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\bufferD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\demoContextD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\diffusePointRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\fluidCompositeRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\fluidEllipsoidRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\fluidSmoothRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\fluidThicknessRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\imguiGraphD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\imguiInteropD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\lineRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\meshRenderer.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\meshRendererD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\meshRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\meshUtil.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12CircularResourceHeap.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12CounterFence.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12DescriptorHeap.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12HelperUtil.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12RenderTarget.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12Resource.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDx12ResourceScopeManager.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDxDebugUtil.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoDxFormatUtil.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\NvCoFreeList.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\pipelineUtilD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\pointRenderPipelineD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d12\renderStateD3D12.cpp">
-			<Filter>d3d12</Filter>
-		</ClCompile>
-	</ItemGroup>
-	<ItemGroup>
 		<Filter Include="d3d11">
 		</Filter>
 	</ItemGroup>
@@ -518,178 +335,121 @@
 		<ClInclude Include="..\..\d3d11\appD3D11Ctx.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\debugLineRenderD3D11.h">
+		<ClInclude Include="..\..\d3d11\debugLineRender.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\demoContextD3D11.h">
+		<ClInclude Include="..\..\d3d11\diffuseRender.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\diffuseRenderD3D11.h">
+		<ClInclude Include="..\..\d3d11\fluidRender.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\fluidRenderD3D11.h">
+		<ClInclude Include="..\..\d3d11\imguiGraph.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
 		<ClInclude Include="..\..\d3d11\imguiGraphD3D11.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\meshRenderD3D11.h">
+		<ClInclude Include="..\..\d3d11\meshRender.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\pointRenderD3D11.h">
+		<ClInclude Include="..\..\d3d11\pointRender.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\renderTargetD3D11.h">
+		<ClInclude Include="..\..\d3d11\renderTarget.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
-		<ClInclude Include="..\..\d3d11\shadowMapD3D11.h">
+		<ClInclude Include="..\..\d3d11\shadowMap.h">
 			<Filter>d3d11</Filter>
 		</ClInclude>
 		<ClCompile Include="..\..\d3d11\appD3D11Ctx.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\debugLineRenderD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\diffuseRender.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\demoContextD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\fluidRender.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\diffuseRenderD3D11.cpp">
-			<Filter>d3d11</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d11\fluidRenderD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\imguiGraph.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
 		<ClCompile Include="..\..\d3d11\imguiGraphD3D11.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\imguiInteropD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\meshRender.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\meshRenderD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\pointRender.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\pointRenderD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\renderTarget.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\renderTargetD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\shadersD3D11.cpp">
 			<Filter>d3d11</Filter>
 		</ClCompile>
-		<ClCompile Include="..\..\d3d11\shadowMapD3D11.cpp">
+		<ClCompile Include="..\..\d3d11\shadowMap.cpp">
 			<Filter>d3d11</Filter>
-		</ClCompile>
-	</ItemGroup>
-	<ItemGroup>
-		<Filter Include="d3d">
-		</Filter>
-	</ItemGroup>
-	<ItemGroup>
-		<ClInclude Include="..\..\d3d\appGraphCtx.h">
-			<Filter>d3d</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d\imguiGraph.h">
-			<Filter>d3d</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d\loader.h">
-			<Filter>d3d</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d\loaderMacros.h">
-			<Filter>d3d</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d\renderParamsD3D.h">
-			<Filter>d3d</Filter>
-		</ClInclude>
-		<ClInclude Include="..\..\d3d\shaderCommonD3D.h">
-			<Filter>d3d</Filter>
-		</ClInclude>
-		<ClCompile Include="..\..\d3d\appGraphCtxLoader.cpp">
-			<Filter>d3d</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d\imguiGraph.cpp">
-			<Filter>d3d</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d\imguiGraphLoader.cpp">
-			<Filter>d3d</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d\loader.cpp">
-			<Filter>d3d</Filter>
-		</ClCompile>
-		<ClCompile Include="..\..\d3d\renderParamsD3D.cpp">
-			<Filter>d3d</Filter>
 		</ClCompile>
 	</ItemGroup>
 	<ItemGroup><Filter Include="Shader Files"></Filter></ItemGroup>
 	<ItemGroup>
-		<FxCompile Include="./../../d3d/shaders/debugLineVS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/debugLineVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/debugLinePS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/debugLinePS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/imguiPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/imguiPS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/imguiVS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/imguiVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/meshPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/meshPS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/meshAsyncComputeBenchPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/meshShadowPS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/meshShadowPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/meshVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/meshVS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/pointVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointVS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/pointGS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointGS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/pointPS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/diffuseVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointShadowPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/diffuseGS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/diffuseVS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/diffusePS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/diffuseGS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/ellipsoidDepthVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/diffusePS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/ellipsoidDepthGS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/ellipsoidDepthVS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/ellipsoidDepthPS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/ellipsoidDepthGS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/passThroughVS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/ellipsoidDepthPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/blurDepthPS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/passThroughVS.hlsl">
-			<Filter>Shader Files</Filter>
-		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/blurDepthPS.hlsl">
-			<Filter>Shader Files</Filter>
-		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/compositePS.hlsl">
-			<Filter>Shader Files</Filter>
-		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointThicknessVS.hlsl">
-			<Filter>Shader Files</Filter>
-		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointThicknessGS.hlsl">
-			<Filter>Shader Files</Filter>
-		</FxCompile>
-		<FxCompile Include="./../../d3d/shaders/pointThicknessPS.hlsl">
+		<FxCompile Include="./../../d3d11/shaders/compositePS.hlsl">
 			<Filter>Shader Files</Filter>
 		</FxCompile>
 	</ItemGroup>

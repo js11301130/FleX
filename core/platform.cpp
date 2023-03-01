@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #include "core.h"
 #include "platform.h"
@@ -39,7 +39,7 @@
 
 using namespace std;
 
-#if defined(WIN32) || defined(WIN64)
+#ifdef WIN32
 
 #include <windows.h>
 #include <commdlg.h>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2008-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -25,56 +25,45 @@
 #include <SDL_video.h>
 #include <SDL_syswm.h>
 
-namespace
-{
-	// COM object release utilities
-	template <class T>
-	void inline COMRelease(T& t)
-	{
-		if (t) t->Release();
-		t = nullptr;
-	}
+AppGraphProfiler* appGraphCreateProfiler(AppGraphCtx* ctx);
+void appGraphProfilerFrameBegin(AppGraphProfiler* profiler);
+void appGraphProfilerFrameEnd(AppGraphProfiler* profiler);
+void appGraphProfilerEnable(AppGraphProfiler* profiler, bool enabled);
+void appGraphProfilerBegin(AppGraphProfiler* profiler, const char* label);
+void appGraphProfilerEnd(AppGraphProfiler* profiler, const char* label);
+bool appGraphProfilerGet(AppGraphProfiler* profiler, const char** plabel, float* cpuTime, float* gpuTime, int index);
+void appGraphReleaseProfiler(AppGraphProfiler* profiler);
 
-	template <class T>
-	void inline COMRelease(T& t, UINT arraySize)
-	{
-		for (UINT i = 0; i < arraySize; i++)
-		{
-			if (t[i]) t[i]->Release();
-			t[i] = nullptr;
-		}
-	}
+AppGraphCtx::AppGraphCtx()
+{
+	m_profiler = appGraphCreateProfiler(this);
+	memset(&m_viewport, 0, sizeof(m_viewport));
 }
 
-AppGraphProfilerD3D11* appGraphCreateProfilerD3D11(AppGraphCtx* ctx);
-void appGraphProfilerD3D11FrameBegin(AppGraphProfilerD3D11* profiler);
-void appGraphProfilerD3D11FrameEnd(AppGraphProfilerD3D11* profiler);
-void appGraphProfilerD3D11Enable(AppGraphProfilerD3D11* profiler, bool enabled);
-void appGraphProfilerD3D11Begin(AppGraphProfilerD3D11* profiler, const char* label);
-void appGraphProfilerD3D11End(AppGraphProfilerD3D11* profiler, const char* label);
-bool appGraphProfilerD3D11Get(AppGraphProfilerD3D11* profiler, const char** plabel, float* cpuTime, float* gpuTime, int index);
-void appGraphReleaseProfiler(AppGraphProfilerD3D11* profiler);
-
-AppGraphCtxD3D11::AppGraphCtxD3D11()
+AppGraphCtx::~AppGraphCtx()
 {
-	m_profiler = appGraphCreateProfilerD3D11(cast_from_AppGraphCtxD3D11(this));
-}
+	AppGraphCtxReleaseRenderTarget(this);
 
-AppGraphCtxD3D11::~AppGraphCtxD3D11()
-{
-	AppGraphCtxReleaseRenderTargetD3D11(cast_from_AppGraphCtxD3D11(this));
-
-	COMRelease(m_device);
-	COMRelease(m_deviceContext);
+	COMRelease(m_swapChain);
+	COMRelease(m_backBuffer);
+	COMRelease(m_rtv);
+	COMRelease(m_depthStencil);
+	COMRelease(m_dsv);
+	COMRelease(m_depthSRV);
 	COMRelease(m_depthState);
+	COMRelease(m_blendState);
+	COMRelease(m_resolvedTarget);
+	COMRelease(m_resolvedTargetSRV);
+	COMRelease(m_deviceContext);
+	COMRelease(m_device);
 
 	appGraphReleaseProfiler(m_profiler);
 	m_profiler = nullptr;
 }
 
-AppGraphCtx* AppGraphCtxCreateD3D11(int deviceID)
+AppGraphCtx* AppGraphCtxCreate(int deviceID)
 {
-	AppGraphCtxD3D11* context = new AppGraphCtxD3D11;
+	AppGraphCtx* context = new AppGraphCtx;
 
 	HRESULT hr = S_OK;
 
@@ -159,71 +148,30 @@ AppGraphCtx* AppGraphCtxCreateD3D11(int deviceID)
 		return nullptr;
 	}
 
-	return cast_from_AppGraphCtxD3D11(context);
+	// create blend state
+	D3D11_BLEND_DESC blendStateDesc = {};
+	blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+	blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+	blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+	blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blendStateDesc.RenderTarget[0].RenderTargetWriteMask = 0x0f;
+
+	if (hr = context->m_device->CreateBlendState(&blendStateDesc, &context->m_blendState))
+	{
+		delete context;
+		return nullptr;
+	}
+
+	return context;
 }
 
-void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* context, SDL_Window* window, bool fullscreen, int numMSAASamples);
-
-bool AppGraphCtxUpdateSizeD3D11(AppGraphCtx* contextIn, SDL_Window* window, bool fullscreen, int numMSAASamples)
+void AppGraphCtxInitRenderTarget(AppGraphCtx* context, SDL_Window* window, bool fullscreen, int samples)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-
 	// TODO: fix iflip fullscreen support
 	fullscreen = false;
-
-	bool sizeChanged = false;
-	int width, height;
-	SDL_GetWindowSize(window, &width, &height);
-
-	// sync with window
-	{
-		HWND hWnd = nullptr;
-		// get Windows handle to this SDL window
-		SDL_SysWMinfo winInfo;
-		SDL_VERSION(&winInfo.version);
-		if (SDL_GetWindowWMInfo(window, &winInfo))
-		{
-			if (winInfo.subsystem == SDL_SYSWM_WINDOWS)
-			{
-				hWnd = winInfo.info.win.window;
-			}
-		}
-		context->m_hWnd = hWnd;
-		context->m_fullscreen = fullscreen;
-
-		HRESULT hr = S_OK;
-		
-		if (context->m_winW != width || context->m_winH != height)
-		{
-			context->m_winW = width;
-			context->m_winH = height;
-			sizeChanged = true;
-			context->m_valid = (context->m_winW != 0 && context->m_winH != 0);
-		}
-	}
-
-	if (sizeChanged)
-	{
-		const bool wasValid = context->m_valid;
-		// Release
-		AppGraphCtxReleaseRenderTargetD3D11(cast_from_AppGraphCtxD3D11(context));
-		// If was valid recreate it
-		if (wasValid)
-		{
-			// Reset the size (the release sets it, to 0,0)
-			context->m_winW = width;
-			context->m_winH = height;
-			// 
-			AppGraphCtxInitRenderTargetD3D11(cast_from_AppGraphCtxD3D11(context), window, fullscreen, numMSAASamples);
-		}
-	}
-
-	return context->m_valid;
-}
-
-void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window, bool fullscreen, int numMSAASamples)
-{
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
 
 	HWND hWnd = nullptr;
 	// get Windows handle to this SDL window
@@ -239,11 +187,15 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 	context->m_hWnd = hWnd;
 	context->m_fullscreen = fullscreen;
 
-	// Desired size
-	int width, height;
-	SDL_GetWindowSize(window, &width, &height);
-
 	HRESULT hr = S_OK;
+
+	RECT rc;
+	GetClientRect(context->m_hWnd, &rc);
+	UINT width = rc.right - rc.left;
+	UINT height = rc.bottom - rc.top;
+
+	context->m_winW = width;
+	context->m_winH = height;
 
 	// enumerate devices
 	IDXGIFactory1* pFactory = NULL;
@@ -255,15 +207,15 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 		DXGI_SWAP_CHAIN_DESC desc;
 		ZeroMemory(&desc, sizeof(desc));
 		desc.BufferCount = 1;
-		desc.BufferDesc.Width = width;
-		desc.BufferDesc.Height = height;
+		desc.BufferDesc.Width = context->m_winW;
+		desc.BufferDesc.Height = context->m_winH;
 		desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.BufferDesc.RefreshRate.Numerator = 0;
 		desc.BufferDesc.RefreshRate.Denominator = 0;
 		desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD; // DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		desc.OutputWindow = context->m_hWnd;
-		desc.SampleDesc.Count = numMSAASamples;
+		desc.SampleDesc.Count = samples;
 		desc.SampleDesc.Quality = 0;
 		desc.Windowed = TRUE; // m_fullscreen ? FALSE : TRUE;
 		desc.Flags = 0u;
@@ -297,8 +249,8 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 
 	// configure scissor and viewport
 	{
-		context->m_viewport.Width = float(width);
-		context->m_viewport.Height = float(height);
+		context->m_viewport.Width = float(context->m_winW);
+		context->m_viewport.Height = float(context->m_winH);
 		context->m_viewport.MaxDepth = 1.f;
 	}
 
@@ -330,7 +282,7 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 		texDesc.MipLevels = 1;
 		texDesc.ArraySize = 1;
 		texDesc.Format = DXGI_FORMAT_R32_TYPELESS; // DXGI_FORMAT_R24G8_TYPELESS
-		texDesc.SampleDesc.Count = numMSAASamples;
+		texDesc.SampleDesc.Count = samples;
 		texDesc.SampleDesc.Quality = 0u;
 		texDesc.Usage = D3D11_USAGE_DEFAULT;
 		texDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
@@ -344,7 +296,7 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 
 		D3D11_DEPTH_STENCIL_VIEW_DESC viewDesc = {};
 		viewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		viewDesc.ViewDimension = (numMSAASamples > 1) ? D3D11_DSV_DIMENSION_TEXTURE2DMS : D3D11_DSV_DIMENSION_TEXTURE2D;
+		viewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DMS;
 		viewDesc.Flags = 0u;
 		viewDesc.Texture2D.MipSlice = 0;
 
@@ -355,7 +307,7 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-		srvDesc.ViewDimension = (numMSAASamples > 1) ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
 		srvDesc.Texture2D.MipLevels = 1;
 		srvDesc.Texture2D.MostDetailedMip = 0;
 
@@ -364,12 +316,42 @@ void AppGraphCtxInitRenderTargetD3D11(AppGraphCtx* contextIn, SDL_Window* window
 			return;
 		}
 	}
+
+	// resolved texture target (for refraction / scene sampling)
+	{
+		D3D11_TEXTURE2D_DESC texDesc = {};
+		texDesc.Width = width;
+		texDesc.Height = height;
+		texDesc.MipLevels = 1;
+		texDesc.ArraySize = 1;
+		texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		texDesc.SampleDesc.Count = 1;
+		texDesc.SampleDesc.Quality = 0u;
+		texDesc.Usage = D3D11_USAGE_DEFAULT;
+		texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		texDesc.CPUAccessFlags = 0;
+		texDesc.MiscFlags = 0;
+
+		if (hr = context->m_device->CreateTexture2D(&texDesc, nullptr, &context->m_resolvedTarget))
+		{
+			return;
+		}
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Texture2D.MostDetailedMip = 0;
+
+		if (hr = context->m_device->CreateShaderResourceView(context->m_resolvedTarget, &srvDesc, &context->m_resolvedTargetSRV))
+		{
+			return;
+		}
+	}
 }
 
-void AppGraphCtxReleaseRenderTargetD3D11(AppGraphCtx* contextIn)
+void AppGraphCtxReleaseRenderTarget(AppGraphCtx* context)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-
 	if (context->m_swapChain == nullptr)
 	{
 		return;
@@ -379,78 +361,68 @@ void AppGraphCtxReleaseRenderTargetD3D11(AppGraphCtx* contextIn)
 	context->m_swapChain->GetFullscreenState(&bFullscreen, nullptr);
 	if (bFullscreen == TRUE) context->m_swapChain->SetFullscreenState(FALSE, nullptr);
 
-	COMRelease(context->m_backBuffer);
 	COMRelease(context->m_swapChain);
+	COMRelease(context->m_backBuffer);
 	COMRelease(context->m_rtv);
 	COMRelease(context->m_depthStencil);
 	COMRelease(context->m_dsv);
 	COMRelease(context->m_depthSRV);
-
-	context->m_valid = false;
-	context->m_winW = 0u;
-	context->m_winH = 0u;
+	COMRelease(context->m_resolvedTarget);
+	COMRelease(context->m_resolvedTargetSRV);
 }
 
-void AppGraphCtxReleaseD3D11(AppGraphCtx* context)
+void AppGraphCtxRelease(AppGraphCtx* context)
 {
 	if (context == nullptr) return;
 
-	delete cast_to_AppGraphCtxD3D11(context);
+	delete context;
 }
 
-void AppGraphCtxFrameStartD3D11(AppGraphCtx* contextIn, AppGraphColor clearColor)
+void AppGraphCtxResolveFrame(AppGraphCtx* context)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
+	context->m_deviceContext->ResolveSubresource(context->m_resolvedTarget, 0, context->m_backBuffer, 0, DXGI_FORMAT_R8G8B8A8_UNORM);
+}
 
-	appGraphProfilerD3D11FrameBegin(context->m_profiler);
+void AppGraphCtxFrameStart(AppGraphCtx* context, float clearColor[4])
+{
+	appGraphProfilerFrameBegin(context->m_profiler);
 
 	context->m_deviceContext->RSSetViewports(1, &context->m_viewport);
 	context->m_deviceContext->RSSetScissorRects(0, nullptr);
 
 	context->m_deviceContext->OMSetRenderTargets(1, &context->m_rtv, context->m_dsv);
 
-	context->m_deviceContext->ClearRenderTargetView(context->m_rtv, &clearColor.r);
+	context->m_deviceContext->ClearRenderTargetView(context->m_rtv, clearColor);
 	context->m_deviceContext->ClearDepthStencilView(context->m_dsv, D3D11_CLEAR_DEPTH, 1.f, 0u);
 
 	context->m_deviceContext->OMSetDepthStencilState(context->m_depthState, 0u);
 }
 
-void AppGraphCtxFramePresentD3D11(AppGraphCtx* contextIn, bool fullsync)
+void AppGraphCtxFramePresent(AppGraphCtx* context, bool fullsync)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-
 	context->m_swapChain->Present(fullsync, 0);
-
-	appGraphProfilerD3D11FrameEnd(context->m_profiler);
+	
+	appGraphProfilerFrameEnd(context->m_profiler);
 }
 
-void AppGraphCtxWaitForFramesD3D11(AppGraphCtx* context, unsigned int maxFramesInFlight)
+void AppGraphCtxProfileEnable(AppGraphCtx* context, bool enabled)
 {
-	// TODO: Implement
+	appGraphProfilerEnable(context->m_profiler, enabled);
 }
 
-void AppGraphCtxProfileEnableD3D11(AppGraphCtx* contextIn, bool enabled)
+void AppGraphCtxProfileBegin(AppGraphCtx* context, const char* label)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-	appGraphProfilerD3D11Enable(context->m_profiler, enabled);
+	appGraphProfilerBegin(context->m_profiler, label);
 }
 
-void AppGraphCtxProfileBeginD3D11(AppGraphCtx* contextIn, const char* label)
+void AppGraphCtxProfileEnd(AppGraphCtx* context, const char* label)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-	appGraphProfilerD3D11Begin(context->m_profiler, label);
+	appGraphProfilerEnd(context->m_profiler, label);
 }
 
-void AppGraphCtxProfileEndD3D11(AppGraphCtx* contextIn, const char* label)
+bool AppGraphCtxProfileGet(AppGraphCtx* context, const char** plabel, float* cpuTime, float* gpuTime, int index)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-	appGraphProfilerD3D11End(context->m_profiler, label);
-}
-
-bool AppGraphCtxProfileGetD3D11(AppGraphCtx* contextIn, const char** plabel, float* cpuTime, float* gpuTime, int index)
-{
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
-	return appGraphProfilerD3D11Get(context->m_profiler, plabel, cpuTime, gpuTime, index);
+	return appGraphProfilerGet(context->m_profiler, plabel, cpuTime, gpuTime, index);
 }
 
 // ******************************* Profiler *********************************
@@ -572,9 +544,9 @@ namespace
 	};
 }
 
-struct AppGraphProfilerD3D11
+struct AppGraphProfiler
 {
-	AppGraphCtxD3D11* m_context;
+	AppGraphCtx* m_context;
 
 	int m_state = 0;
 	bool m_enabled = false;
@@ -591,30 +563,30 @@ struct AppGraphProfilerD3D11
 	TimerValue m_timerValues[m_timersCap];
 	int m_timerValuesSize = 0;
 
-	AppGraphProfilerD3D11(AppGraphCtx* context);
-	~AppGraphProfilerD3D11();
+	AppGraphProfiler(AppGraphCtx* context);
+	~AppGraphProfiler();
 };
 
-AppGraphProfilerD3D11::AppGraphProfilerD3D11(AppGraphCtx* context) : m_context(cast_to_AppGraphCtxD3D11(context))
+AppGraphProfiler::AppGraphProfiler(AppGraphCtx* context) : m_context(context) 
 {
 }
 
-AppGraphProfilerD3D11::~AppGraphProfilerD3D11()
+AppGraphProfiler::~AppGraphProfiler()
 {
 	COMRelease(m_disjoint);
 }
 
-AppGraphProfilerD3D11* appGraphCreateProfilerD3D11(AppGraphCtx* ctx)
+AppGraphProfiler* appGraphCreateProfiler(AppGraphCtx* ctx)
 {
-	return new AppGraphProfilerD3D11(ctx);
+	return new AppGraphProfiler(ctx);
 }
 
-void appGraphReleaseProfiler(AppGraphProfilerD3D11* profiler)
+void appGraphReleaseProfiler(AppGraphProfiler* profiler)
 {
 	delete profiler;
 }
 
-void appGraphProfilerD3D11FrameBegin(AppGraphProfilerD3D11* p)
+void appGraphProfilerFrameBegin(AppGraphProfiler* p)
 {
 	p->m_frameTime = (float)p->m_frameTimer.getDeltaTime();
 
@@ -639,7 +611,7 @@ void appGraphProfilerD3D11FrameBegin(AppGraphProfilerD3D11* p)
 	}
 }
 
-void appGraphProfilerD3D11FrameEnd(AppGraphProfilerD3D11* p)
+void appGraphProfilerFrameEnd(AppGraphProfiler* p)
 {
 	if (p->m_state == 1)
 	{
@@ -651,12 +623,12 @@ void appGraphProfilerD3D11FrameEnd(AppGraphProfilerD3D11* p)
 	}
 }
 
-void appGraphProfilerD3D11Enable(AppGraphProfilerD3D11* p, bool enabled)
+void appGraphProfilerEnable(AppGraphProfiler* p, bool enabled)
 {
 	p->m_enabled = enabled;
 }
 
-void appGraphProfilerD3D11Begin(AppGraphProfilerD3D11* p, const char* label)
+void appGraphProfilerBegin(AppGraphProfiler* p, const char* label)
 {
 	if (p->m_state == 1 && p->m_timersSize < p->m_timersCap)
 	{
@@ -680,7 +652,7 @@ void appGraphProfilerD3D11Begin(AppGraphProfilerD3D11* p, const char* label)
 	}
 }
 
-void appGraphProfilerD3D11End(AppGraphProfilerD3D11* p, const char* label)
+void appGraphProfilerEnd(AppGraphProfiler* p, const char* label)
 {
 	if (p->m_state == 1)
 	{
@@ -704,7 +676,7 @@ void appGraphProfilerD3D11End(AppGraphProfilerD3D11* p, const char* label)
 	}
 }
 
-bool appGraphProfilerD3D11Flush(AppGraphProfilerD3D11* p)
+bool appGraphProfilerFlush(AppGraphProfiler* p)
 {
 	if (p->m_state == 2)
 	{
@@ -763,9 +735,9 @@ bool appGraphProfilerD3D11Flush(AppGraphProfilerD3D11* p)
 	return false;
 }
 
-bool appGraphProfilerD3D11Get(AppGraphProfilerD3D11* p, const char** plabel, float* cpuTime, float* gpuTime, int index)
+bool appGraphProfilerGet(AppGraphProfiler* p, const char** plabel, float* cpuTime, float* gpuTime, int index)
 {
-	appGraphProfilerD3D11Flush(p);
+	appGraphProfilerFlush(p);
 	{
 		if (index < p->m_timerValuesSize)
 		{
@@ -783,8 +755,7 @@ bool appGraphProfilerD3D11Get(AppGraphProfilerD3D11* p, const char** plabel, flo
 	return false;
 }
 
-size_t AppGraphCtxDedicatedVideoMemoryD3D11(AppGraphCtx* contextIn)
+size_t AppGraphCtxDedicatedVideoMemory(AppGraphCtx* context)
 {
-	auto context = cast_to_AppGraphCtxD3D11(contextIn);
 	return context->m_dedicatedVideoMemory;
 }

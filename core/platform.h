@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -44,7 +44,7 @@ std::string GetWorkingDirectory();
 
 #include <android/log.h>
 
-#ifndef LOGE
+#ifndef 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR  , "Flex", __VA_ARGS__)
 #endif
 

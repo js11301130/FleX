@@ -27,7 +27,8 @@ public:
 
 		g_numSubsteps = 3;
 
-		g_colors[1] = Colour(0.805f, 0.702f, 0.401f);		
+		extern Colour gColors[];
+		gColors[1] = Colour(0.805f, 0.702f, 0.401f);		
 
 		// draw options		
 		g_drawPoints = true;

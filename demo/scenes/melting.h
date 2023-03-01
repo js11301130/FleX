@@ -13,8 +13,10 @@ public:
 		g_params.dynamicFriction = 0.25f;
 		g_params.dissipation = 0.0f;
 		g_params.viscosity = 0.0f;
+		g_params.fluid = true;
 		g_params.cohesion = 0.0f;
 		g_params.fluidRestDistance = g_params.radius*0.6f;
+		g_params.anisotropyScale = 4.0f / g_params.radius;
 		g_params.smoothing = 0.5f;
 
 		const float spacing = g_params.radius*0.5f;
@@ -61,7 +63,7 @@ public:
 
 	virtual void Sync()
 	{
-		NvFlexSetRigids(g_solver, g_buffers->rigidOffsets.buffer, g_buffers->rigidIndices.buffer, g_buffers->rigidLocalPositions.buffer, g_buffers->rigidLocalNormals.buffer, g_buffers->rigidCoefficients.buffer, g_buffers->rigidPlasticThresholds.buffer, g_buffers->rigidPlasticCreeps.buffer, g_buffers->rigidRotations.buffer, g_buffers->rigidTranslations.buffer, g_buffers->rigidOffsets.size() - 1, g_buffers->rigidIndices.size());
+		NvFlexSetRigids(g_flex, g_buffers->rigidOffsets.buffer, g_buffers->rigidIndices.buffer, g_buffers->rigidLocalPositions.buffer, g_buffers->rigidLocalNormals.buffer, g_buffers->rigidCoefficients.buffer, g_buffers->rigidRotations.buffer, g_buffers->rigidTranslations.buffer, g_buffers->rigidOffsets.size() - 1, g_buffers->rigidIndices.size());
 	}
 
 	int mFrame;

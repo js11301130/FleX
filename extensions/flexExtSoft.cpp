@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 20132017 NVIDIA Corporation. All rights reserved.
 
 #include "../include/NvFlexExt.h"
 
@@ -41,506 +41,513 @@ using namespace std;
 namespace
 {
 
-Vec3 CalculateMean(const Vec3* particles, const int* indices, int numIndices)
-{
-	Vec3 sum;
-
-	for (int i = 0; i < numIndices; ++i)
-		sum += Vec3(particles[indices[i]]);
-
-	if (numIndices)
-		return sum / float(numIndices);
-	else
-		return sum;
-}
-
-float CalculateRadius(const Vec3* particles, Vec3 center, const int* indices, int numIndices)
-{
-	float radiusSq = 0.0f;
-
-	for (int i = 0; i < numIndices; ++i)
+	Vec3 CalculateMean(const Vec3* particles, const int* indices, int numIndices)
 	{
-		float dSq = LengthSq(Vec3(particles[indices[i]]) - center);
-		if (dSq > radiusSq)
-			radiusSq = dSq;
+		Vec3 sum;
+
+		for (int i = 0; i < numIndices; ++i)
+			sum += Vec3(particles[indices[i]]);
+
+		if (numIndices)
+			return sum / float(numIndices);
+		else
+			return sum;
 	}
 
-	return sqrtf(radiusSq);
-}
-
-struct Cluster
-{
-	Vec3 mean;
-	float radius;
-
-	// indices of particles belonging to this cluster
-	std::vector<int> indices;
-};
-
-struct Seed
-{
-	int index;
-	float priority;
-
-	bool operator < (const Seed& rhs) const
+	float CalculateRadius(const Vec3* particles, Vec3 center, const int* indices, int numIndices)
 	{
-		return priority < rhs.priority;
+		float radiusSq = 0.0f;
+
+		for (int i = 0; i < numIndices; ++i)
+		{
+			float dSq = LengthSq(Vec3(particles[indices[i]]) - center);
+			if (dSq > radiusSq)
+				radiusSq = dSq;
+		}
+
+		return sqrtf(radiusSq);
 	}
-};
 
-// basic SAP based acceleration structure for point cloud queries
-struct SweepAndPrune
-{
-	struct Entry
+	struct Cluster
 	{
-		Entry(Vec3 p, int i) : point(p), index(i) {}
+		Vec3 mean;
+		float radius;
 
-		Vec3 point;
-		int index;
+		// indices of particles belonging to this cluster
+		std::vector<int> indices;
 	};
 
-	SweepAndPrune(const Vec3* points, int n)
+	struct Seed
 	{
-		entries.reserve(n);		
-		for (int i=0; i < n; ++i)
-			entries.push_back(Entry(points[i], i));
+		int index;
+		float priority;
 
-		struct SortOnAxis
+		bool operator < (const Seed& rhs) const
 		{
-			int axis;
+			return priority < rhs.priority;
+		}
+	};
 
-			SortOnAxis(int axis) : axis(axis) {}
+	// basic SAP based acceleration structure for point cloud queries
+	struct SweepAndPrune
+	{
+		struct Entry
+		{
+			Entry(Vec3 p, int i) : point(p), index(i) {}
 
-			bool operator()(const Entry& lhs, const Entry& rhs) const			
-			{
-				return lhs.point[axis] < rhs.point[axis];
-			}
+			Vec3 point;
+			int index;
 		};
 
-		// calculate particle bounds and longest axis
-		Vec3 lower(FLT_MAX), upper(-FLT_MAX);
-		for (int i=0; i < n; ++i)
+		SweepAndPrune(const Vec3* points, int n)
 		{
-			lower = Min(points[i], lower);
-			upper = Max(points[i], upper);
-		}
+			entries.reserve(n);
+			for (int i = 0; i < n; ++i)
+				entries.push_back(Entry(points[i], i));
 
-		Vec3 edges = upper-lower;
-		
-		if (edges.x > edges.y && edges.x > edges.z)
-			longestAxis = 0;
-		else if (edges.y > edges.z)
-			longestAxis = 1;
-		else
-			longestAxis = 2;
-		
-		std::sort(entries.begin(), entries.end(), SortOnAxis(longestAxis));
-	}
+			struct SortOnAxis
+			{
+				int axis;
 
-	void QuerySphere(Vec3 center, float radius, std::vector<int>& indices)
-	{
-		// find start point in the array
-		int low = 0;
-		int high = int(entries.size());
-		
-		// the point we are trying to find
-		float queryLower = center[longestAxis] - radius;
-		float queryUpper = center[longestAxis] + radius;
+				SortOnAxis(int axis) : axis(axis) {}
 
-		// binary search to find the start point in the sorted entries array
-		while (low < high)
-		{
-			const int mid = (high+low)/2;
+				bool operator()(const Entry& lhs, const Entry& rhs) const
+				{
+					return lhs.point[axis] < rhs.point[axis];
+				}
+			};
 
-			if (queryLower > entries[mid].point[longestAxis])
-				low = mid+1;
+			// calculate particle bounds and longest axis
+			Vec3 lower(FLT_MAX), upper(-FLT_MAX);
+			for (int i = 0; i < n; ++i)
+			{
+				lower = Min(points[i], lower);
+				upper = Max(points[i], upper);
+			}
+
+			Vec3 edges = upper - lower;
+
+			if (edges.x > edges.y && edges.x > edges.z)
+				longestAxis = 0;
+			else if (edges.y > edges.z)
+				longestAxis = 1;
 			else
-				high = mid;
+				longestAxis = 2;
+
+			std::sort(entries.begin(), entries.end(), SortOnAxis(longestAxis));
 		}
 
-		// scan forward over potential overlaps
-		float radiusSq = radius*radius;
-
-		for (int i=low; i < int(entries.size()); ++i)
+		void QuerySphere(Vec3 center, float radius, std::vector<int>& indices)
 		{
-			Vec3 p = entries[i].point;
+			// find start point in the array
+			int low = 0;
+			int high = int(entries.size());
 
-			if (LengthSq(p-center) < radiusSq)
+			// the point we are trying to find
+			float queryLower = center[longestAxis] - radius;
+			float queryUpper = center[longestAxis] + radius;
+
+			// binary search to find the start point in the sorted entries array
+			while (low < high)
 			{
-				indices.push_back(entries[i].index);
-			}					
-			else if (entries[i].point[longestAxis] > queryUpper)
+				const int mid = (high + low) / 2;
+
+				if (queryLower > entries[mid].point[longestAxis])
+					low = mid + 1;
+				else
+					high = mid;
+			}
+
+			// scan forward over potential overlaps
+			float radiusSq = radius * radius;
+
+			for (int i = low; i < int(entries.size()); ++i)
 			{
-				// early out if ther are no more possible candidates
-				break;
+				Vec3 p = entries[i].point;
+
+				if (LengthSq(p - center) < radiusSq)
+				{
+					indices.push_back(entries[i].index);
+				}
+				else if (entries[i].point[longestAxis] > queryUpper)
+				{
+					// early out if ther are no more possible candidates
+					break;
+				}
 			}
 		}
-	}
-	
-	int longestAxis;	// [0,2] -> x,y,z
 
-	std::vector<Entry> entries;
-};
+		int longestAxis;	// [0,2] -> x,y,z
 
-int CreateClusters(Vec3* particles, const float* priority, int numParticles, std::vector<int>& outClusterOffsets, std::vector<int>& outClusterIndices, std::vector<Vec3>& outClusterPositions, float radius, float smoothing = 0.0f)
-{
-	std::vector<Seed> seeds;
-	std::vector<Cluster> clusters;
+		std::vector<Entry> entries;
+	};
 
-	// flags a particle as belonging to at least one cluster
-	std::vector<bool> used(numParticles, false);
-
-	// initialize seeds
-	for (int i = 0; i < numParticles; ++i)
+	int CreateClusters(Vec3* particles, const float* priority, int numParticles, std::vector<int>& outClusterOffsets, std::vector<int>& outClusterIndices, std::vector<Vec3>& outClusterPositions, std::vector<float>& outClusterHue, float radius, float smoothing = 0.0f)
 	{
-		Seed s;
-		s.index = i;
-		s.priority = priority[i];
+		std::vector<Seed> seeds;
+		std::vector<Cluster> clusters;
 
-		seeds.push_back(s);
-	}
+		// flags a particle as belonging to at least one cluster
+		std::vector<bool> used(numParticles, false);
 
-	// sort seeds on priority
-	std::stable_sort(seeds.begin(), seeds.end());
-
-	SweepAndPrune sap(particles, numParticles);
-
-	while (seeds.size())
-	{
-		// pick highest unused particle from the seeds list
-		Seed seed = seeds.back();
-		seeds.pop_back();
-
-		if (!used[seed.index])
+		// initialize seeds
+		for (int i = 0; i < numParticles; ++i)
 		{
-			Cluster c;
+			Seed s;
+			s.index = i;
+			s.priority = priority[i];
 
-			sap.QuerySphere(Vec3(particles[seed.index]), radius, c.indices);
-			
-			// mark overlapping particles as used so they are removed from the list of potential cluster seeds
-			for (int i=0; i < int(c.indices.size()); ++i)
-				used[c.indices[i]] = true;
-
-			c.mean = CalculateMean(particles, &c.indices[0], int(c.indices.size()));
-
-			clusters.push_back(c);
+			seeds.push_back(s);
 		}
-	}
 
-	if (smoothing > 0.0f)
-	{
-		for (int i = 0; i < int(clusters.size()); ++i)
+		// sort seeds on priority
+		std::stable_sort(seeds.begin(), seeds.end());
+
+		SweepAndPrune sap(particles, numParticles);
+
+		while (seeds.size())
 		{
-			Cluster& c = clusters[i];
+			// pick highest unused particle from the seeds list
+			Seed seed = seeds.back();
+			seeds.pop_back();
 
-			// clear cluster indices
-			c.indices.resize(0);
-
-			// calculate cluster particles using cluster mean and smoothing radius
-			sap.QuerySphere(c.mean, smoothing, c.indices);
-
-			c.mean = CalculateMean(particles, &c.indices[0], int(c.indices.size()));
-		}
-	}
-
-	// write out cluster indices
-	int count = 0;
-
-	for (int c = 0; c < int(clusters.size()); ++c)
-	{
-		const Cluster& cluster = clusters[c];
-
-		const int clusterSize = int(cluster.indices.size());
-
-		// skip empty clusters
-		if (clusterSize)
-		{
-			// write cluster indices
-			for (int i = 0; i < clusterSize; ++i)
-				outClusterIndices.push_back(cluster.indices[i]);
-
-			// write cluster offset
-			outClusterOffsets.push_back(int(outClusterIndices.size()));
-
-			// write center
-			outClusterPositions.push_back(cluster.mean);
-
-			++count;
-		}
-	}
-
-	return count;
-}
-
-// creates distance constraints between particles within some radius
-int CreateLinks(const Vec3* particles, int numParticles, std::vector<int>& outSpringIndices, std::vector<float>& outSpringLengths, std::vector<float>& outSpringStiffness, float radius, float stiffness = 1.0f)
-{
-	int count = 0;
-
-	std::vector<int> neighbors;
-	SweepAndPrune sap(particles, numParticles);
-
-	for (int i = 0; i < numParticles; ++i)
-	{
-		neighbors.resize(0);
-
-		sap.QuerySphere(Vec3(particles[i]), radius, neighbors);
-
-		for (int j = 0; j < int(neighbors.size()); ++j)
-		{
-			const int nj = neighbors[j];
-
-			if (nj != i)
+			if (!used[seed.index])
 			{
-				outSpringIndices.push_back(i);
-				outSpringIndices.push_back(nj);
-				outSpringLengths.push_back(Length(Vec3(particles[i]) - Vec3(particles[nj])));
-				outSpringStiffness.push_back(stiffness);
+				Cluster c;
+
+				sap.QuerySphere(Vec3(particles[seed.index]), radius, c.indices);
+
+				// mark overlapping particles as used so they are removed from the list of potential cluster seeds
+				for (int i = 0; i < int(c.indices.size()); ++i)
+					used[c.indices[i]] = true;
+
+				c.mean = CalculateMean(particles, &c.indices[0], int(c.indices.size()));
+
+				clusters.push_back(c);
+			}
+		}
+
+		if (smoothing > 0.0f)
+		{
+			for (int i = 0; i < int(clusters.size()); ++i)
+			{
+				Cluster& c = clusters[i];
+
+				// clear cluster indices
+				c.indices.resize(0);
+
+				// calculate cluster particles using cluster mean and smoothing radius
+				sap.QuerySphere(c.mean, smoothing, c.indices);
+
+				c.mean = CalculateMean(particles, &c.indices[0], int(c.indices.size()));
+			}
+		}
+
+		// write out cluster indices
+		int count = 0;
+
+		RandInit();
+		for (int c = 0; c < int(clusters.size()); ++c)
+		{
+			const Cluster& cluster = clusters[c];
+
+			const int clusterSize = int(cluster.indices.size());
+
+			float clusterHue = Randf(); // random cluster hue value (Mobai Change)
+
+			// skip empty clusters
+			if (clusterSize)
+			{
+				// write cluster indices
+				for (int i = 0; i < clusterSize; ++i) {
+					outClusterIndices.push_back(cluster.indices[i]);
+
+					// set cluster particle color (Mobai Change)
+					if (outClusterHue.size() > 0) {
+						outClusterHue[cluster.indices[i]] = clusterHue;
+					}
+				}
+				// write cluster offset
+				outClusterOffsets.push_back(int(outClusterIndices.size()));
+
+				// write center
+				outClusterPositions.push_back(cluster.mean);
 
 				++count;
 			}
 		}
+
+		return count;
 	}
 
-	return count;
-}
-
-void CreateSkinning(const Vec3* vertices, int numVertices, const Vec3* clusters, int numClusters, float* outWeights, int* outIndices, float falloff, float maxdist)
-{
-	const int maxBones = 4;
-
-	SweepAndPrune sap(clusters, numClusters);
-
-	std::vector<int> influences;
-
-	// for each vertex, find the closest n clusters
-	for (int i = 0; i < numVertices; ++i)
+	// creates distance constraints between particles within some radius
+	int CreateLinks(const Vec3* particles, int numParticles, std::vector<int>& outSpringIndices, std::vector<float>& outSpringLengths, std::vector<float>& outSpringStiffness, float radius, float stiffness = 1.0f)
 	{
-		int indices[4] = { -1, -1, -1, -1 };
-		float distances[4] = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-		float weights[maxBones];
+		int count = 0;
 
-		influences.resize(0);
-		sap.QuerySphere(vertices[i], maxdist, influences);
+		std::vector<int> neighbors;
+		SweepAndPrune sap(particles, numParticles);
 
-		for (int c = 0; c < int(influences.size()); ++c)			
+		for (int i = 0; i < numParticles; ++i)
 		{
-			float dSq = LengthSq(vertices[i] - clusters[influences[c]]);
+			neighbors.resize(0);
 
-			// insertion sort
-			int w = 0;
-			for (; w < maxBones; ++w)
-				if (dSq < distances[w])
-					break;
+			sap.QuerySphere(Vec3(particles[i]), radius, neighbors);
 
-			if (w < maxBones)
+			for (int j = 0; j < int(neighbors.size()); ++j)
 			{
-				// shuffle down
-				for (int s = maxBones - 1; s > w; --s)
-				{
-					indices[s] = indices[s - 1];
-					distances[s] = distances[s - 1];
-				}
+				const int nj = neighbors[j];
 
-				distances[w] = dSq;
-				indices[w] = influences[c];
+				if (nj != i)
+				{
+					outSpringIndices.push_back(i);
+					outSpringIndices.push_back(nj);
+					outSpringLengths.push_back(Length(Vec3(particles[i]) - Vec3(particles[nj])));
+					outSpringStiffness.push_back(stiffness);
+
+					++count;
+				}
 			}
 		}
 
-		// weight particles according to distance
-		float wSum = 0.0f;
+		return count;
+	}
 
-		for (int w = 0; w < maxBones; ++w)
+	void CreateSkinning(const Vec3* vertices, int numVertices, const Vec3* clusters, int numClusters, float* outWeights, int* outIndices, float falloff, float maxdist)
+	{
+		const int maxBones = 4;
+
+		SweepAndPrune sap(clusters, numClusters);
+
+		std::vector<int> influences;
+
+		// for each vertex, find the closest n clusters
+		for (int i = 0; i < numVertices; ++i)
 		{
-			if (distances[w] > Sqr(maxdist))
+			int indices[4] = { -1, -1, -1, -1 };
+			float distances[4] = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+			float weights[maxBones];
+
+			influences.resize(0);
+			sap.QuerySphere(vertices[i], maxdist, influences);
+
+			for (int c = 0; c < int(influences.size()); ++c)
 			{
-				// clamp bones over a given distance to zero
-				weights[w] = 0.0f;
+				float dSq = LengthSq(vertices[i] - clusters[influences[c]]);
+
+				// insertion sort
+				int w = 0;
+				for (; w < maxBones; ++w)
+					if (dSq < distances[w])
+						break;
+
+				if (w < maxBones)
+				{
+					// shuffle down
+					for (int s = maxBones - 1; s > w; --s)
+					{
+						indices[s] = indices[s - 1];
+						distances[s] = distances[s - 1];
+					}
+
+					distances[w] = dSq;
+					indices[w] = influences[c];
+				}
+			}
+
+			// weight particles according to distance
+			float wSum = 0.0f;
+
+			for (int w = 0; w < maxBones; ++w)
+			{
+				if (distances[w] > Sqr(maxdist))
+				{
+					// clamp bones over a given distance to zero
+					weights[w] = 0.0f;
+				}
+				else
+				{
+					// weight falls off inversely with distance
+					weights[w] = 1.0f / (powf(distances[w], falloff) + 0.0001f);
+				}
+
+				wSum += weights[w];
+			}
+
+			if (wSum == 0.0f)
+			{
+				// if all weights are zero then just 
+				// rigidly skin to the closest bone
+				weights[0] = 1.0f;
 			}
 			else
 			{
-				// weight falls off inversely with distance
-				weights[w] = 1.0f / (powf(distances[w], falloff) + 0.0001f);
-			}
-
-			wSum += weights[w];
-		}
-
-		if (wSum == 0.0f)
-		{
-			// if all weights are zero then just 
-			// rigidly skin to the closest bone
-			weights[0] = 1.0f;
-		}
-		else
-		{
-			// normalize weights
-			for (int w = 0; w < maxBones; ++w)
-			{
-				weights[w] = weights[w] / wSum;
-			}
-		}
-
-		// output
-		for (int j = 0; j < maxBones; ++j)
-		{
-			outWeights[i*maxBones + j] = weights[j];
-			outIndices[i*maxBones + j] = indices[j];
-		}
-	}
-}
-
-// creates mesh interior and surface sample points and clusters them into particles
-void SampleMesh(const Vec3* vertices, int numVertices, const int* indices, int numIndices, float radius, float volumeSampling, float surfaceSampling, std::vector<Vec3>& outPositions)
-{
-	Vec3 meshLower(FLT_MAX);
-	Vec3 meshUpper(-FLT_MAX);
-
-	for (int i = 0; i < numVertices; ++i)
-	{
-		meshLower = Min(meshLower, vertices[i]);
-		meshUpper = Max(meshUpper, vertices[i]);
-	}
-
-	std::vector<Vec3> samples;
-
-	if (volumeSampling > 0.0f)
-	{
-		// recompute expanded edges
-		Vec3 edges = meshUpper - meshLower;
-
-		// use a higher resolution voxelization as a basis for the particle decomposition
-		float spacing = radius / volumeSampling;
-
-		// tweak spacing to avoid edge cases for particles laying on the boundary
-		// just covers the case where an edge is a whole multiple of the spacing.
-		float spacingEps = spacing*(1.0f - 1e-4f);
-
-		// make sure to have at least one particle in each dimension
-		int dx, dy, dz;
-		dx = spacing > edges.x ? 1 : int(edges.x / spacingEps);
-		dy = spacing > edges.y ? 1 : int(edges.y / spacingEps);
-		dz = spacing > edges.z ? 1 : int(edges.z / spacingEps);
-
-		int maxDim = max(max(dx, dy), dz);
-
-		// expand border by two voxels to ensure adequate sampling at edges
-		meshLower -= 2.0f*Vec3(spacing);
-		meshUpper += 2.0f*Vec3(spacing);
-		maxDim += 4;
-
-		vector<uint32_t> voxels(maxDim*maxDim*maxDim);
-
-		// we shift the voxelization bounds so that the voxel centers
-		// lie symmetrically to the center of the object. this reduces the 
-		// chance of missing features, and also better aligns the particles
-		// with the mesh
-		Vec3 meshOffset;
-		meshOffset.x = 0.5f * (spacing - (edges.x - (dx - 1)*spacing));
-		meshOffset.y = 0.5f * (spacing - (edges.y - (dy - 1)*spacing));
-		meshOffset.z = 0.5f * (spacing - (edges.z - (dz - 1)*spacing));
-		meshLower -= meshOffset;
-
-		Voxelize(vertices, numVertices, indices, numIndices, maxDim, maxDim, maxDim, &voxels[0], meshLower, meshLower + Vec3(maxDim*spacing));
-
-		// sample interior
-		for (int x = 0; x < maxDim; ++x)
-		{
-			for (int y = 0; y < maxDim; ++y)
-			{
-				for (int z = 0; z < maxDim; ++z)
+				// normalize weights
+				for (int w = 0; w < maxBones; ++w)
 				{
-					const int index = z*maxDim*maxDim + y*maxDim + x;
+					weights[w] = weights[w] / wSum;
+				}
+			}
 
-					// if voxel is marked as occupied the add a particle
-					if (voxels[index])
+			// output
+			for (int j = 0; j < maxBones; ++j)
+			{
+				outWeights[i * maxBones + j] = weights[j];
+				outIndices[i * maxBones + j] = indices[j];
+			}
+		}
+	}
+
+	// creates mesh interior and surface sample points and clusters them into particles
+	void SampleMesh(const Vec3* vertices, int numVertices, const int* indices, int numIndices, float radius, float volumeSampling, float surfaceSampling, std::vector<Vec3>& outPositions)
+	{
+		Vec3 meshLower(FLT_MAX);
+		Vec3 meshUpper(-FLT_MAX);
+
+		for (int i = 0; i < numVertices; ++i)
+		{
+			meshLower = Min(meshLower, vertices[i]);
+			meshUpper = Max(meshUpper, vertices[i]);
+		}
+
+		std::vector<Vec3> samples;
+
+		if (volumeSampling > 0.0f)
+		{
+			// recompute expanded edges
+			Vec3 edges = meshUpper - meshLower;
+
+			// use a higher resolution voxelization as a basis for the particle decomposition
+			float spacing = radius / volumeSampling;
+
+			// tweak spacing to avoid edge cases for particles laying on the boundary
+			// just covers the case where an edge is a whole multiple of the spacing.
+			float spacingEps = spacing * (1.0f - 1e-4f);
+
+			// make sure to have at least one particle in each dimension
+			int dx, dy, dz;
+			dx = spacing > edges.x ? 1 : int(edges.x / spacingEps);
+			dy = spacing > edges.y ? 1 : int(edges.y / spacingEps);
+			dz = spacing > edges.z ? 1 : int(edges.z / spacingEps);
+
+			int maxDim = max(max(dx, dy), dz);
+
+			// expand border by two voxels to ensure adequate sampling at edges
+			meshLower -= 2.0f * Vec3(spacing);
+			meshUpper += 2.0f * Vec3(spacing);
+			maxDim += 4;
+
+			vector<uint32_t> voxels(maxDim * maxDim * maxDim);
+
+			// we shift the voxelization bounds so that the voxel centers
+			// lie symmetrically to the center of the object. this reduces the 
+			// chance of missing features, and also better aligns the particles
+			// with the mesh
+			Vec3 meshOffset;
+			meshOffset.x = 0.5f * (spacing - (edges.x - (dx - 1) * spacing));
+			meshOffset.y = 0.5f * (spacing - (edges.y - (dy - 1) * spacing));
+			meshOffset.z = 0.5f * (spacing - (edges.z - (dz - 1) * spacing));
+			meshLower -= meshOffset;
+
+			Voxelize((const float*)vertices, numVertices, indices, numIndices, maxDim, maxDim, maxDim, &voxels[0], meshLower, meshLower + Vec3(maxDim * spacing));
+
+			// sample interior
+			for (int x = 0; x < maxDim; ++x)
+			{
+				for (int y = 0; y < maxDim; ++y)
+				{
+					for (int z = 0; z < maxDim; ++z)
 					{
-						Vec3 position = meshLower + spacing*Vec3(float(x) + 0.5f, float(y) + 0.5f, float(z) + 0.5f);
+						const int index = z * maxDim * maxDim + y * maxDim + x;
 
-						// normalize the sdf value and transform to world scale
-						samples.push_back(position);
+						// if voxel is marked as occupied the add a particle
+						if (voxels[index])
+						{
+							Vec3 position = meshLower + spacing * Vec3(float(x) + 0.5f, float(y) + 0.5f, float(z) + 0.5f);
+
+							// normalize the sdf value and transform to world scale
+							samples.push_back(position);
+						}
 					}
 				}
 			}
 		}
-	}
 
-	if (surfaceSampling > 0.0f)
-	{
-		// sample vertices
-		for (int i = 0; i < numVertices; ++i)
-			samples.push_back(vertices[i]);
-
-		// random surface sampling (non-uniform)
-		const int numSamples = int(50000 * surfaceSampling);
-		const int numTriangles = numIndices/3;
-
-		RandInit();
-
-		for (int i = 0; i < numSamples; ++i)
+		if (surfaceSampling > 0.0f)
 		{
-			int t = Rand() % numTriangles;
-			float u = Randf();
-			float v = Randf()*(1.0f - u);
-			float w = 1.0f - u - v;
+			// sample vertices
+			for (int i = 0; i < numVertices; ++i)
+				samples.push_back(vertices[i]);
 
-			int a = indices[t*3 + 0];
-			int b = indices[t*3 + 1];
-			int c = indices[t*3 + 2];
+			// random surface sampling (non-uniform)
+			const int numSamples = int(50000 * surfaceSampling);
+			const int numTriangles = numIndices / 3;
 
-			Vec3 p = vertices[a] * u + vertices[b] * v + vertices[c] * w;
+			RandInit();
 
-			samples.push_back(p);
+			for (int i = 0; i < numSamples; ++i)
+			{
+				int t = Rand() % numTriangles;
+				float u = Randf();
+				float v = Randf() * (1.0f - u);
+				float w = 1.0f - u - v;
+
+				int a = indices[t * 3 + 0];
+				int b = indices[t * 3 + 1];
+				int c = indices[t * 3 + 2];
+
+				Vec3 p = vertices[a] * u + vertices[b] * v + vertices[c] * w;
+
+				samples.push_back(p);
+			}
 		}
+
+		std::vector<int> clusterIndices;
+		std::vector<int> clusterOffsets;
+		std::vector<Vec3> clusterPositions;
+		std::vector<float> priority(samples.size());
+		std::vector<float> clusterHue;
+
+		// cluster mesh sample points into actual particles
+		CreateClusters(&samples[0], &priority[0], int(samples.size()), clusterOffsets, clusterIndices, outPositions, clusterHue, radius);
 	}
-
-	std::vector<int> clusterIndices;
-	std::vector<int> clusterOffsets;
-	std::vector<Vec3> clusterPositions;
-	std::vector<float> priority(samples.size());
-
-	// cluster mesh sample points into actual particles
-	CreateClusters(&samples[0], &priority[0], int(samples.size()), clusterOffsets, clusterIndices, outPositions, radius);
-}
 
 } // anonymous namespace
 
 // API methods
 
-NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(const float* vertices, int numVertices, const int* indices, int numIndices, float particleSpacing, float volumeSampling, float surfaceSampling, float clusterSpacing, float clusterRadius, float clusterStiffness, float linkRadius, float linkStiffness, float globalStiffness, float clusterPlasticThreshold, float clusterPlasticCreep)
+NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(
+	const float* vertices, int numVertices,
+	const int* indices, int numIndices,
+	float particleSpacing,
+	float volumeSampling,
+	float surfaceSampling,
+	float clusterSpacing,
+	float clusterRadius,
+	float clusterStiffness,
+	float linkRadius,
+	float linkStiffness,
+	float globalStiffness)
 {
-	// Switch to relative coordinates by computing the mean position of the vertices and subtracting the result from every vertex position
-	// The increased precision will prevent ghost forces caused by inaccurate center of mass computations
-	Vec3 meshOffset(0.0f);
-	for (int i = 0; i < numVertices; i++)
-	{
-		meshOffset += ((Vec3*)vertices)[i];
-	}
-	meshOffset /= float(numVertices);
-
-	Vec3* relativeVertices = new Vec3[numVertices];
-	for (int i = 0; i < numVertices; i++)
-	{
-		relativeVertices[i] += ((Vec3*)vertices)[i] - meshOffset;
-	}
-
 	// construct asset definition
 	NvFlexExtAsset* asset = new NvFlexExtAsset();
 
 	// create particle sampling
 	std::vector<Vec3> samples;
-	SampleMesh(relativeVertices, numVertices, indices, numIndices, particleSpacing, volumeSampling, surfaceSampling, samples);
+	SampleMesh((Vec3*)vertices, numVertices, indices, numIndices, particleSpacing, volumeSampling, surfaceSampling, samples);
 
-	delete[] relativeVertices;
-
-	const int numParticles = int(samples.size());	
+	const int numParticles = int(samples.size());
 
 	std::vector<int> clusterIndices;
 	std::vector<int> clusterOffsets;
 	std::vector<Vec3> clusterPositions;
 	std::vector<float> clusterCoefficients;
-	std::vector<float> clusterPlasticThresholds;
-	std::vector<float> clusterPlasticCreeps;
+	std::vector<float> clusterHue;
+	//clusterHue.resize(samples.size());
+	for (size_t i = 0; i < samples.size(); i++)
+	{
+		clusterHue.push_back(0.9);
+	}
 
 	// priority (not currently used)
 	std::vector<float> priority(numParticles);
@@ -548,23 +555,99 @@ NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(const float* vertices, int numVertic
 		priority[i] = 0.0f;
 
 	// cluster particles into shape matching groups
-	int numClusters = CreateClusters(&samples[0], &priority[0], int(samples.size()), clusterOffsets, clusterIndices, clusterPositions, clusterSpacing, clusterRadius);
-	
-	// assign all clusters the same stiffness 
+	int numClusters = CreateClusters(&samples[0], &priority[0], int(samples.size()), clusterOffsets, clusterIndices, clusterPositions, clusterHue, clusterSpacing, clusterRadius);
+
+	//// create only 1 cluster
+	//for (size_t i = 0; i < samples.size(); i++)
+	//{
+	//	clusterIndices.push_back(i);
+	//	clusterHue.push_back(0.5);
+	//}
+	//clusterOffsets.push_back(samples.size());
+	//clusterPositions.push_back(Vec3(0, 0, 0));
+
+	//// (Mobai Change Start) -------------------------------------------------------
+	// //create 3 clusters
+
+	//Vec3 mean_vec(0, 0, 0);
+	//for (size_t i = 0; i < samples.size(); i++)
+	//{
+	//	mean_vec += samples[i];
+	//}
+	//mean_vec /= samples.size();
+	//mean_vec.y -= 0.3;
+	////mean_vec.x -= 0.3;
+
+	//int cluster1Num = 0;
+	//Vec3 mean_vec_1(0, 0, 0);
+	//int cluster2Num = 0;
+	//Vec3 mean_vec_2(0, 0, 0);
+	//int cluster3Num = 0;
+	//Vec3 mean_vec_3(0, 0, 0);
+
+	//// create first cluster (upper part)
+	//for (size_t i = 0; i < samples.size(); i++)
+	//{
+	//	if (samples[i].x < mean_vec.x && samples[i].y >= mean_vec.y) {
+	//		//mean_vec_1 += samples[i];
+	//		clusterHue[i] = 0.1;
+	//		clusterIndices.push_back(i);
+	//		cluster1Num++;
+	//	}
+	//	//else if (samples[i].y < mean_vec.y) {
+	//	//	//if (i % 2 == 0) {
+	//	//	//mean_vec_1 += samples[i];
+	//	//	clusterHue[i] = 0.5;
+	//	//	clusterIndices.push_back(i);
+	//	//	cluster1Num++;
+	//	//	//}
+	//	//}
+	//}
+	////mean_vec_1 /= cluster1Num;
+	//clusterOffsets.push_back(cluster1Num);
+	//clusterPositions.push_back(mean_vec_1);
+
+	//// create second cluster (lower part)
+	//for (size_t i = 0; i < samples.size(); i++)
+	//{
+	//	if (samples[i].x >= mean_vec.x && samples[i].y >= mean_vec.y) {
+	//		clusterIndices.push_back(i);
+	//		clusterHue[i] = 0.9;
+	//		//mean_vec_2 += samples[i];
+	//		cluster2Num++;
+	//	}
+	//	//else if (samples[i].y < mean_vec.y) {
+	//	//	//if (i % 2 == 1) {
+	//	//	clusterHue[i] = 0.5;
+	//	//	clusterIndices.push_back(i);
+	//	//	//mean_vec_2 += samples[i];
+	//	//	cluster2Num++;
+	//	//	//}
+	//	//}
+	//}
+
+	//clusterOffsets.push_back(cluster1Num + cluster2Num);
+	////clusterPositions.push_back(mean_vec_2);
+
+	//// the third cluster
+	//for (size_t i = 0; i < samples.size(); i++)
+	//{
+	//	if (samples[i].y < (mean_vec.y + 0.1)) {
+	//		clusterHue[i] = 0.3;
+	//		clusterIndices.push_back(i);
+	//		cluster3Num++;
+	//	}
+	//}
+	//clusterOffsets.push_back(cluster1Num + cluster2Num + cluster3Num);
+
+	////// (Mobai Change End) -------------------------------------------------------
+
+	//// assign all clusters the same stiffness 
 	clusterCoefficients.resize(numClusters, clusterStiffness);
-
-	if (clusterPlasticCreep) 
-	{
-		// assign all clusters the same plastic threshold 
-		clusterPlasticThresholds.resize(numClusters, clusterPlasticThreshold);
-
-		// assign all clusters the same plastic creep 
-		clusterPlasticCreeps.resize(numClusters, clusterPlasticCreep);
-	}
 
 	// create links between clusters 
 	if (linkRadius > 0.0f)
-	{		
+	{
 		std::vector<int> springIndices;
 		std::vector<float> springLengths;
 		std::vector<float> springStiffness;
@@ -574,15 +657,15 @@ NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(const float* vertices, int numVertic
 
 		// assign links
 		if (numLinks)
-		{			
+		{
 			asset->springIndices = new int[numLinks * 2];
-			memcpy(asset->springIndices, &springIndices[0], sizeof(int)*springIndices.size());
+			memcpy(asset->springIndices, &springIndices[0], sizeof(int) * springIndices.size());
 
 			asset->springCoefficients = new float[numLinks];
-			memcpy(asset->springCoefficients, &springStiffness[0], sizeof(float)*numLinks);
+			memcpy(asset->springCoefficients, &springStiffness[0], sizeof(float) * numLinks);
 
 			asset->springRestLengths = new float[numLinks];
-			memcpy(asset->springRestLengths, &springLengths[0], sizeof(float)*numLinks);
+			memcpy(asset->springRestLengths, &springLengths[0], sizeof(float) * numLinks);
 
 			asset->numSprings = numLinks;
 		}
@@ -593,77 +676,57 @@ NvFlexExtAsset* NvFlexExtCreateSoftFromMesh(const float* vertices, int numVertic
 	{
 		numClusters += 1;
 		clusterCoefficients.push_back(globalStiffness);
-		if (clusterPlasticCreep) 
-		{
-			clusterPlasticThresholds.push_back(clusterPlasticThreshold);
-			clusterPlasticCreeps.push_back(clusterPlasticCreep);
-		}
 
 		for (int i = 0; i < numParticles; ++i)
 		{
 			clusterIndices.push_back(i);
 		}
+
 		clusterOffsets.push_back((int)clusterIndices.size());
 
 		// the mean of the global cluster is the mean of all particles
 		Vec3 globalMeanPosition(0.0f);
+
 		for (int i = 0; i < numParticles; ++i)
 		{
 			globalMeanPosition += samples[i];
 		}
 		globalMeanPosition /= float(numParticles);
-		clusterPositions.push_back(globalMeanPosition);
-	}
 
-	// Switch back to absolute coordinates by adding meshOffset to the centers of mass and to each particle positions
-	for (int i = 0; i < numParticles; ++i)
-	{
-		 samples[i] += meshOffset;
-	}
-	for (int i = 0; i < numClusters; ++i)
-	{
-		clusterPositions[i] += meshOffset;
+		clusterPositions.push_back(globalMeanPosition);
 	}
 
 	// assign particles
 	asset->particles = new float[numParticles * 4];
+	asset->particleHue = new float[numParticles];
 	asset->numParticles = numParticles;
 	asset->maxParticles = numParticles;
 
 	for (int i = 0; i < numParticles; ++i)
 	{
-		asset->particles[i*4+0] = samples[i].x;
-		asset->particles[i*4+1] = samples[i].y;
-		asset->particles[i*4+2] = samples[i].z;
-		asset->particles[i*4+3] = 1.0f;
+		asset->particles[i * 4 + 0] = samples[i].x;
+		asset->particles[i * 4 + 1] = samples[i].y;
+		asset->particles[i * 4 + 2] = samples[i].z;
+		asset->particles[i * 4 + 3] = 1.0f;
 	}
 
 	// assign shapes
 	asset->shapeIndices = new int[clusterIndices.size()];
-	memcpy(asset->shapeIndices, &clusterIndices[0], sizeof(int)*clusterIndices.size());
+	memcpy(asset->shapeIndices, &clusterIndices[0], sizeof(int) * clusterIndices.size());
+
+	// new defined attribute (cluter color) (Mobai Change)
+	asset->particleHue = new float[clusterIndices.size()];
+	memcpy(asset->particleHue, &clusterHue[0], sizeof(float) * clusterIndices.size());
 
 	asset->shapeOffsets = new int[numClusters];
-	memcpy(asset->shapeOffsets, &clusterOffsets[0], sizeof(int)*numClusters);
+	memcpy(asset->shapeOffsets, &clusterOffsets[0], sizeof(int) * numClusters);
 
-	asset->shapeCenters = new float[numClusters*3];
-	memcpy(asset->shapeCenters, &clusterPositions[0], sizeof(float)*numClusters*3);
+	asset->shapeCenters = new float[numClusters * 3];
+	memcpy(asset->shapeCenters, &clusterPositions[0], sizeof(float) * numClusters * 3);
 
 	asset->shapeCoefficients = new float[numClusters];
-	memcpy(asset->shapeCoefficients, &clusterCoefficients[0], sizeof(float)*numClusters);
+	memcpy(asset->shapeCoefficients, &clusterCoefficients[0], sizeof(float) * numClusters);
 
-	if (clusterPlasticCreep) 
-	{
-		asset->shapePlasticThresholds = new float[numClusters];
-		memcpy(asset->shapePlasticThresholds, &clusterPlasticThresholds[0], sizeof(float)*numClusters);
-
-		asset->shapePlasticCreeps = new float[numClusters];
-		memcpy(asset->shapePlasticCreeps, &clusterPlasticCreeps[0], sizeof(float)*numClusters);
-	}
-	else
-	{
-		asset->shapePlasticThresholds = NULL;
-		asset->shapePlasticCreeps = NULL;
-	}
 
 	asset->numShapeIndices = int(clusterIndices.size());
 	asset->numShapes = numClusters;

@@ -1,0 +1,12 @@
+﻿  compilation header save succeeded; see F:\UnityProject\FleX\demo\d3d11\shaders\debugLineVS.hlsl.h
+  compilation header save succeeded; see F:\UnityProject\FleX\demo\d3d11\shaders\debugLinePS.hlsl.h
+  compilation header save succeeded; see F:\UnityProject\FleX\demo\d3d11\shaders\imguiPS.hlsl.h
+  compilation header save succeeded; see F:\UnityProject\FleX\demo\d3d11\shaders\imguiVS.hlsl.h
+F:\UnityProject\FleX\demo\d3d11\shaders\shaderCommon.h(1,1): error X3000: syntax error: unexpected token '%'
+F:\UnityProject\FleX\demo\d3d11\shaders\shaderCommon.h(1,4122-1): error X1005: string continues past end of line
+F:\UnityProject\FleX\demo\d3d11\shaders\shaderCommon.h(7,22): error X1005: string continues past end of line
+F:\UnityProject\FleX\demo\d3d11\shaders\shaderCommon.h(7,34): error X1005: string continues past end of line
+F:\UnityProject\FleX\demo\d3d11\shaders\shaderCommon.h(7,308): error X1005: string continues past end of line
+F:\UnityProject\FleX\demo\d3d11\shaders\shaderCommon.h(17,33): error X1005: string continues past end of line
+  
+  compilation failed; no code produced

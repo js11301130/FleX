@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 20132017 NVIDIA Corporation. All rights reserved.
 
 #include "../include/NvFlexExt.h"
 
@@ -68,26 +68,11 @@ Vec3 SampleSDFGrad(const float* sdf, int dim, int x, int y, int z)
 
 NvFlexExtAsset* NvFlexExtCreateRigidFromMesh(const float* vertices, int numVertices, const int* indices, int numTriangleIndices, float spacing, float expand)
 {
-	// Switch to relative coordinates by computing the mean position of the vertices and subtracting the result from every vertex position
-	// The increased precision will prevent ghost forces caused by inaccurate center of mass computations
-	Vec3 meshOffset(0.0f);
-	for (int i = 0; i < numVertices; i++)
-	{
-		meshOffset += ((Vec3*)vertices)[i];
-	}
-	meshOffset /= float(numVertices);
-
-	Vec3* relativeVertices = new Vec3[numVertices];
-	for (int i = 0; i < numVertices; i++)
-	{
-		relativeVertices[i] += ((Vec3*)vertices)[i] - meshOffset;
-	}
-
 	std::vector<Vec4> particles;
 	std::vector<Vec4> normals;
 	std::vector<int> phases;
 
-	const Vec3* positions = relativeVertices;
+	const Vec3* positions = (Vec3*)vertices;
 
 	Vec3 meshLower(FLT_MAX), meshUpper(-FLT_MAX);
 	for (int i=0; i < numVertices; ++i)
@@ -120,11 +105,11 @@ NvFlexExtAsset* NvFlexExtCreateRigidFromMesh(const float* vertices, int numVerti
 	// lie symmetrically to the center of the object. this reduces the 
 	// chance of missing features, and also better aligns the particles
 	// with the mesh
-	Vec3 meshShift;
-	meshShift.x = 0.5f * (spacing - (edges.x - (dx-1)*spacing));
-	meshShift.y = 0.5f * (spacing - (edges.y - (dy-1)*spacing));
-	meshShift.z = 0.5f * (spacing - (edges.z - (dz-1)*spacing));
-	meshLower -= meshShift;
+	Vec3 meshOffset;
+	meshOffset.x = 0.5f * (spacing - (edges.x - (dx-1)*spacing));
+	meshOffset.y = 0.5f * (spacing - (edges.y - (dy-1)*spacing));
+	meshOffset.z = 0.5f * (spacing - (edges.z - (dz-1)*spacing));
+	meshLower -= meshOffset;
 
 	// don't allow samplings with > 64 per-side	
 	if (maxDim > 64)
@@ -132,9 +117,7 @@ NvFlexExtAsset* NvFlexExtCreateRigidFromMesh(const float* vertices, int numVerti
 
 	std::vector<uint32_t> voxels(maxDim*maxDim*maxDim);
 
-	Voxelize(relativeVertices, numVertices, indices, numTriangleIndices, maxDim, maxDim, maxDim, &voxels[0], meshLower, meshLower + Vec3(maxDim*spacing));
-
-	delete[] relativeVertices;
+	Voxelize(vertices, numVertices, indices, numTriangleIndices, maxDim, maxDim, maxDim, &voxels[0], meshLower, meshLower + Vec3(maxDim*spacing));
 
 	std::vector<float> sdf(maxDim*maxDim*maxDim);
 	MakeSDF(&voxels[0], maxDim, maxDim, maxDim, &sdf[0]);
@@ -170,26 +153,22 @@ NvFlexExtAsset* NvFlexExtCreateRigidFromMesh(const float* vertices, int numVerti
 			}
 		}
 	}
-	const int numParticles = int(particles.size());
-
-	// Switch back to absolute coordinates by adding meshOffset to the center of mass and to each particle positions
-	center /= float(numParticles);
-	center += meshOffset;
-
-	for (int i = 0; i < numParticles; i++) {
-		particles[i] += Vec4(meshOffset, 0.0f);
-	}
 
 	NvFlexExtAsset* asset = new NvFlexExtAsset();
 	memset(asset, 0, sizeof(*asset));
 
-	if (numParticles)
+	if (particles.size())
 	{
+		const int numParticles = int(particles.size());
+
 		asset->numParticles = numParticles;
 		asset->maxParticles = numParticles;
 
 		asset->particles = new float[numParticles*4];
 		memcpy(asset->particles, &particles[0], sizeof(Vec4)*numParticles);
+
+		// store center of mass
+		center /= float(numParticles);
 
 		asset->numShapes = 1;
 		asset->numShapeIndices = numParticles;
@@ -200,14 +179,10 @@ NvFlexExtAsset* NvFlexExtCreateRigidFromMesh(const float* vertices, int numVerti
 		for (int i = 0; i < numParticles; ++i)
 			asset->shapeIndices[i] = i;
 
-		// store center of mass
 		asset->shapeCenters = new float[4];
 		asset->shapeCenters[0] = center.x;
 		asset->shapeCenters[1] = center.y;
 		asset->shapeCenters[2] = center.z;
-
-		asset->shapePlasticThresholds = NULL;
-		asset->shapePlasticCreeps = NULL;
 
 		asset->shapeCoefficients = new float[1];
 		asset->shapeCoefficients[0] = 1.0f;

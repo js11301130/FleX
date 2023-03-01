@@ -23,11 +23,11 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
 struct Mesh;
 
 // voxelizes a mesh using a single pass parity algorithm
-void Voxelize(const Vec3* vertices, int numVertices, const int* indices, int numTriangleIndices, uint32_t width, uint32_t height, uint32_t depth, uint32_t* volume, Vec3 minExtents, Vec3 maxExtents);
+void Voxelize(const float* vertices, int numVertices, const int* indices, int numTriangleIndices, uint32_t width, uint32_t height, uint32_t depth, uint32_t* volume, Vec3 minExtents, Vec3 maxExtents);

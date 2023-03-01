@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2013-2016 NVIDIA Corporation. All rights reserved.
 
 #pragma once
 
@@ -43,12 +43,15 @@ struct Mesh
 
     void CalculateNormals();
     void Transform(const Matrix44& m);
+    void Transform2(const Matrix44& m);
 	void Normalize(float s=1.0f);	// scale so bounds in any dimension equals s and lower bound = (0,0,0)
 
     void GetBounds(Vector3& minExtents, Vector3& maxExtents) const;
 
     std::vector<Point3> m_positions;
+    std::vector<Point3> original_positions;
     std::vector<Vector3> m_normals;
+    std::vector<Vector3> original_normals;
     std::vector<Vector2> m_texcoords[2];
     std::vector<Colour> m_colours;
 

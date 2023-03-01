@@ -46,13 +46,6 @@ public:
 		g_lightDistance *= 1.5f;
 
 		mTime = 0.0f;
-
-		if (mType == 3)
-		{
-			Mesh* m = CreateDiscMesh(0.75f, 32);
-			mMesh = CreateTriangleMesh(m);
-			delete m;
-		}
 	}
 
 	void Update()
@@ -87,9 +80,6 @@ public:
 		case 2:
 			AddCapsule(0.1f, 1.5f, pos, rot);
 			break;
-		case 3:
-			AddTriangleMesh(mMesh, pos, rot, 1.0f);
-			break;
 		};
 		
 		g_buffers->shapePrevPositions[0] = Vec4(prevPos, 0.0f);
@@ -100,6 +90,4 @@ public:
 
 	float mTime;
 	int mType;
-
-	NvFlexTriangleMeshId mMesh;
 };

@@ -23,7 +23,7 @@
 // components in life support devices or systems without express written approval of
 // NVIDIA Corporation.
 //
-// Copyright (c) 2013-2020 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 20132017 NVIDIA Corporation. All rights reserved.
 
 #include "../shaders.h"
 
@@ -33,10 +33,8 @@
 #include "../../core/extrude.h"
 
 #include "../../external/SDL2-2.0.4/include/SDL.h"
-#include "../../external/glad/src/glad.c"
 
 #include "imguiRenderGL.h"
-#include "utilsGL.h"
 
 #include "shader.h"
 
@@ -46,181 +44,7 @@
 #include "android/AndroidMatrixTool.h"
 #endif
 
-
 #define CudaCheck(x) { cudaError_t err = x; if (err != cudaSuccess) { printf("Cuda error: %d in %s at %s:%d\n", err, #x, __FILE__, __LINE__); assert(0); } }
-
-typedef unsigned int VertexBuffer;
-typedef unsigned int IndexBuffer;
-typedef unsigned int Texture;
-
-struct FluidRenderBuffersGL
-{
-	FluidRenderBuffersGL(int numParticles = 0):
-		mPositionVBO(0),
-		mDensityVBO(0),
-		mIndices(0),
-		mPositionBuf(nullptr),
-		mDensitiesBuf(nullptr),
-		mIndicesBuf(nullptr)
-	{
-		mNumParticles = numParticles;
-		for (int i = 0; i < 3; i++)
-		{ 
-			mAnisotropyVBO[i] = 0;
-			mAnisotropyBuf[i] = nullptr;
-		}
-	}
-	~FluidRenderBuffersGL()
-	{
-		glDeleteBuffers(1, &mPositionVBO);
-		glDeleteBuffers(3, mAnisotropyVBO);
-		glDeleteBuffers(1, &mDensityVBO);
-		glDeleteBuffers(1, &mIndices);
-
-		NvFlexUnregisterOGLBuffer(mPositionBuf);
-		NvFlexUnregisterOGLBuffer(mDensitiesBuf);
-		NvFlexUnregisterOGLBuffer(mIndicesBuf);
-
-		NvFlexUnregisterOGLBuffer(mAnisotropyBuf[0]);
-		NvFlexUnregisterOGLBuffer(mAnisotropyBuf[1]);
-		NvFlexUnregisterOGLBuffer(mAnisotropyBuf[2]);
-	}
-
-	int mNumParticles;
-	VertexBuffer mPositionVBO;
-	VertexBuffer mDensityVBO;
-	VertexBuffer mAnisotropyVBO[3];
-	IndexBuffer mIndices;
-
-	// wrapper buffers that allow Flex to write directly to VBOs
-	NvFlexBuffer* mPositionBuf;
-	NvFlexBuffer* mDensitiesBuf;
-	NvFlexBuffer* mAnisotropyBuf[3];
-	NvFlexBuffer* mIndicesBuf;
-};
-
-// vertex buffers for diffuse particles
-struct DiffuseRenderBuffersGL
-{
-	DiffuseRenderBuffersGL(int numParticles = 0):
-		mDiffusePositionVBO(0),
-		mDiffuseVelocityVBO(0),
-		mDiffuseIndicesIBO(0),
-		mDiffuseIndicesBuf(nullptr),
-		mDiffusePositionsBuf(nullptr),
-		mDiffuseVelocitiesBuf(nullptr)
-	{
-		mNumParticles = numParticles;
-	}
-	~DiffuseRenderBuffersGL()
-	{
-		if (mNumParticles > 0)
-		{
-			glDeleteBuffers(1, &mDiffusePositionVBO);
-			glDeleteBuffers(1, &mDiffuseVelocityVBO);
-			glDeleteBuffers(1, &mDiffuseIndicesIBO);
-
-			NvFlexUnregisterOGLBuffer(mDiffuseIndicesBuf);
-			NvFlexUnregisterOGLBuffer(mDiffusePositionsBuf);
-			NvFlexUnregisterOGLBuffer(mDiffuseVelocitiesBuf);
-		}
-	}
-
-	int mNumParticles;
-	VertexBuffer mDiffusePositionVBO;
-	VertexBuffer mDiffuseVelocityVBO;
-	IndexBuffer mDiffuseIndicesIBO;
-
-	NvFlexBuffer* mDiffuseIndicesBuf;
-	NvFlexBuffer* mDiffusePositionsBuf;
-	NvFlexBuffer* mDiffuseVelocitiesBuf;
-};
-
-struct FluidRenderer
-{
-	GLuint mDepthFbo;
-	GLuint mDepthTex;
-	GLuint mDepthSmoothTex;
-	GLuint mSceneFbo;
-	GLuint mSceneTex;
-	GLuint mReflectTex;
-
-	GLuint mThicknessFbo;
-	GLuint mThicknessTex;
-
-	GLuint mPointThicknessProgram;
-	//GLuint mPointDepthProgram;
-
-	GLuint mEllipsoidThicknessProgram;
-	GLuint mEllipsoidDepthProgram;
-
-	GLuint mCompositeProgram;
-	GLuint mDepthBlurProgram;
-
-	int mSceneWidth;
-	int mSceneHeight;
-};
-
-struct ShadowMap
-{
-	GLuint texture;
-	GLuint framebuffer;
-};
-
-struct GpuMesh
-{
-	GLuint mPositionsVBO;
-	GLuint mNormalsVBO;
-	GLuint mIndicesIBO;
-
-	int mNumVertices;
-	int mNumFaces;
-};
-
-// texture pool
-#include "../../core/png.h"
-
-GLuint LoadTexture(const char* filename)
-{
-    PngImage img;
-    if (PngLoad(filename, img))
-    {
-        GLuint tex;
-
-        glVerify(glGenTextures(1, &tex));
-        glVerify(glActiveTexture(GL_TEXTURE0));
-        glVerify(glBindTexture(GL_TEXTURE_2D, tex));
-
-        glVerify(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
-        glVerify(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-        glVerify(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
-        glVerify(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
-        glVerify(glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE));
-        glVerify(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.m_width, img.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.m_data));
-
-        PngFree(img);
-
-        return tex;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
-struct RenderTexture
-{
-    GLuint colorTex;
-    GLuint colorFrameBuffer;
-
-    GLuint depthTex;
-    GLuint depthFrameBuffer;
-
-    RenderTexture()
-    {
-        memset(this, 0, sizeof(*this));
-    }
-};
 
 namespace
 {
@@ -235,26 +59,34 @@ int g_screenHeight;
 
 SDL_Window* g_window;
 
-static float g_spotMin = 0.5f;
-static float g_spotMax = 1.0f;
-float g_shadowBias = 0.05f;
+static float gSpotMin = 0.5f;
+static float gSpotMax = 1.0f;
+float gShadowBias = 0.05f;
 
 } // anonymous namespace
 
-extern NvFlexLibrary* g_flexLib;
-extern Colour g_colors[];
-
-extern Mesh* g_mesh;
-void DrawShapes();
-
-namespace OGL_Renderer
+Colour gColors[] =
 {
+	Colour(0.0f, 0.5f, 1.0f),
+	Colour(0.797f, 0.354f, 0.000f),
+	Colour(0.092f, 0.465f, 0.820f),
+	Colour(0.000f, 0.349f, 0.173f),
+	Colour(0.875f, 0.782f, 0.051f),
+	Colour(0.000f, 0.170f, 0.453f),
+	Colour(0.673f, 0.111f, 0.000f),
+	Colour(0.612f, 0.194f, 0.394f)
+};
 
-void InitRender(const RenderInitOptions& options)
+
+struct ShadowMap
 {
-	SDL_Window* window = options.window;
-	int msaaSamples = options.numMsaaSamples;
+	GLuint texture;
+	GLuint framebuffer;
+};
 
+
+void InitRender(SDL_Window* window, bool fullscreen, int msaaSamples)
+{
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
 
@@ -270,10 +102,8 @@ void InitRender(const RenderInitOptions& options)
 	// This makes our buffer swap syncronized with the monitor's vertical refresh
 	SDL_GL_SetSwapInterval(1);
 
-	if (!gladLoadGLLoader(SDL_GL_GetProcAddress))
-	{
-		printf("Could not initialize GL extensions\n");
-	}
+	glewExperimental = GL_TRUE;
+	glewInit();
 
 	imguiRenderGLInit(GetFilePathByPlatform("../../data/DroidSans.ttf").c_str());
 
@@ -283,6 +113,7 @@ void InitRender(const RenderInitOptions& options)
 
 void DestroyRender()
 {
+
 }
 
 void StartFrame(Vec4 clearColor)
@@ -395,8 +226,11 @@ void imguiGraphDraw()
 	glPopMatrix();
 }
 
-void ReshapeRender(int width, int height, bool minimized)
+void ReshapeRender(SDL_Window* window)
 {
+	int width, height;
+	SDL_GetWindowSize(window, &width, &height);
+
 	if (g_msaaSamples)
 	{
 		glVerify(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -439,39 +273,35 @@ void ReshapeRender(int width, int height, bool minimized)
 
 void GetViewRay(int x, int y, Vec3& origin, Vec3& dir)
 {
-	float modelview[16];
-	glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+	double modelview[16];
+	glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
-	float projection[16];
-	glGetFloatv(GL_PROJECTION_MATRIX, projection);
+	double projection[16];
+	glGetDoublev(GL_PROJECTION_MATRIX, projection);
 
 	int viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
 
-	float nearPos[3];
-	UnProjectf(float(x), float(y), 0.0f, modelview, projection, viewport, nearPos);
+	double nearPos[3];
+// Begin Add Android Support
+#ifdef ANDROID
+	glhUnProjectf(double(x), double(y), 0.0f, modelview, projection, viewport, nearPos);
+#else
+	gluUnProject(double(x), double(y), 0.0f, modelview, projection, viewport, &nearPos[0], &nearPos[1], &nearPos[2]);
+#endif
+// End Add Android Support
 
-	float farPos[3];
-	UnProjectf(float(x), float(y), 1.0f, modelview, projection, viewport, farPos);
+	double farPos[3];
+// Begin Add Android Support
+#ifdef ANDROID
+	glhUnProjectf(double(x), double(y), 1.0f, modelview, projection, viewport, farPos);
+#else
+	gluUnProject(double(x), double(y), 1.0f, modelview, projection, viewport, &farPos[0], &farPos[1], &farPos[2]);
+#endif	
+// End Add Android Support
 
 	origin = Vec3(float(nearPos[0]), float(nearPos[1]), float(nearPos[2]));
 	dir = Normalize(Vec3(float(farPos[0]-nearPos[0]), float(farPos[1]-nearPos[1]), float(farPos[2]-nearPos[2])));
-}
-
-Vec3 GetScreenCoord(Vec3& pos) {
-	float modelview[16];
-	glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
-
-	float projection[16];
-	glGetFloatv(GL_PROJECTION_MATRIX, projection);
-
-	int viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-
-	float screen[3];
-	Projectf(pos.x, pos.y, pos.z, modelview, projection, viewport, screen);
-
-	return Vec3((float)screen[0], (float)screen[1], (float)screen[2]);
 }
 
 void ReadFrame(int* backbuffer, int width, int height)
@@ -487,50 +317,7 @@ void PresentFrame(bool fullsync)
 	glFinish();
 	SDL_GL_SwapWindow(g_window);
 #endif
-}
 
-RenderTexture* CreateRenderTexture(const char* filename)
-{
-	GLuint tex = LoadTexture(filename);
-
-	if (tex)
-	{
-		RenderTexture* t = new RenderTexture();
-		t->colorTex = tex;
-
-		return t;
-	}
-	else
-	{
-		return NULL;
-	}
-}
-
-RenderTexture* CreateRenderTarget(int width, int height, bool depth)
-{
-	return NULL;
-}
-
-void DestroyRenderTexture(RenderTexture* t)
-{
-	if (t)
-	{
-		if (t->colorTex)
-			glDeleteTextures(1, &t->colorTex);
-
-		if (t->colorFrameBuffer)
-			glDeleteFramebuffers(1, &t->colorFrameBuffer);
-
-		if (t->depthTex)
-			glDeleteTextures(1, &t->depthTex);
-
-		if (t->depthFrameBuffer)
-			glDeleteFramebuffers(1, &t->depthFrameBuffer);
-
-		delete t;
-
-		
-	}
 }
 
 
@@ -838,7 +625,7 @@ void ShadowApply(GLint sprogram, Vec3 lightPos, Vec3 lightTarget, Matrix44 light
 	glUniform3fv(uLightDir, 1, Normalize(lightTarget-lightPos));
 
 	GLint uBias = glGetUniformLocation(sprogram, "bias");
-	glUniform1f(uBias, g_shadowBias);
+	glUniform1f(uBias, gShadowBias);
 
 	const Vec2 taps[] = 
 	{ 
@@ -859,13 +646,8 @@ void ShadowApply(GLint sprogram, Vec3 lightPos, Vec3 lightTarget, Matrix44 light
 
 }
 
-void DrawPoints(FluidRenderBuffers* buffersIn, int n, int offset, float radius, float screenWidth, float screenAspect, float fov, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ShadowMap* shadowMap, bool showDensity)
+void DrawPoints(GLuint positions, GLuint colors, GLuint indices, int n, int offset, float radius, float screenWidth, float screenAspect, float fov, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ShadowMap* shadowMap, bool showDensity)
 {
-	FluidRenderBuffersGL* buffers = reinterpret_cast<FluidRenderBuffersGL*>(buffersIn);
-	GLuint positions = buffers->mPositionVBO;
-	GLuint colors = buffers->mDensityVBO;
-	GLuint indices = buffers->mIndices;
-
 	static int sprogram = -1;
 	if (sprogram == -1)
 	{
@@ -889,10 +671,10 @@ void DrawPoints(FluidRenderBuffers* buffersIn, int n, int offset, float radius, 
 		glVerify(glUseProgram(sprogram));
 		glVerify(glUniform1f( glGetUniformLocation(sprogram, "pointRadius"), radius));
 		glVerify(glUniform1f( glGetUniformLocation(sprogram, "pointScale"), screenWidth/screenAspect * (1.0f / (tanf(fov*0.5f)))));
-		glVerify(glUniform1f( glGetUniformLocation(sprogram, "spotMin"), g_spotMin));
-		glVerify(glUniform1f( glGetUniformLocation(sprogram, "spotMax"), g_spotMax));
+		glVerify(glUniform1f( glGetUniformLocation(sprogram, "spotMin"), gSpotMin));
+		glVerify(glUniform1f( glGetUniformLocation(sprogram, "spotMax"), gSpotMax));
 		glVerify(glUniform1i( glGetUniformLocation(sprogram, "mode"), mode));
-		glVerify(glUniform4fv( glGetUniformLocation(sprogram, "colors"), 8, (float*)&g_colors[0].r));
+		glVerify(glUniform4fv( glGetUniformLocation(sprogram, "colors"), 8, (float*)&gColors[0].r));
 
 		// set shadow parameters
 		ShadowApply(sprogram, lightPos, lightTarget, lightTransform, shadowMap->texture);
@@ -935,7 +717,6 @@ void DrawPoints(FluidRenderBuffers* buffersIn, int n, int offset, float radius, 
 		glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);		
 	}
 }
-
 void DrawPlane(const Vec4& p);
 
 static GLuint s_diffuseProgram = GLuint(-1);
@@ -1036,8 +817,8 @@ void BindSolidShader(Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, S
 
 		glVerify(glUseProgram(s_diffuseProgram));
 		glVerify(glUniform1i(glGetUniformLocation(s_diffuseProgram, "grid"), 0));
-		glVerify(glUniform1f( glGetUniformLocation(s_diffuseProgram, "spotMin"), g_spotMin));
-		glVerify(glUniform1f( glGetUniformLocation(s_diffuseProgram, "spotMax"), g_spotMax));
+		glVerify(glUniform1f( glGetUniformLocation(s_diffuseProgram, "spotMin"), gSpotMin));
+		glVerify(glUniform1f( glGetUniformLocation(s_diffuseProgram, "spotMax"), gSpotMax));
 		glVerify(glUniform4fv( glGetUniformLocation(s_diffuseProgram, "fogColor"), 1, fogColor));
 
 		glVerify(glUniformMatrix4fv( glGetUniformLocation(s_diffuseProgram, "objectTransform"), 1, false, Matrix44::kIdentity));
@@ -1055,47 +836,6 @@ void UnbindSolidShader()
 
 	glUseProgram(0);
 }
-
-
-void SetMaterial(const Matrix44& xform, const RenderMaterial& mat)
-{
-	GLint program;
-	glGetIntegerv(GL_CURRENT_PROGRAM, &program);
-
-	if (program)
-	{
-		glUniformMatrix4fv( glGetUniformLocation(program, "objectTransform"), 1, false, xform);
-
-		const float maxSpecularPower = 2048.0f;
-
-		glVerify(glUniform1f(glGetUniformLocation(program, "specularPower"), powf(maxSpecularPower, 1.0f-mat.roughness)));
-		glVerify(glUniform3fv(glGetUniformLocation(program, "specularColor"), 1, Lerp(Vec3(mat.specular*0.08f), mat.frontColor, mat.metallic)));
-		glVerify(glUniform1f(glGetUniformLocation(program, "roughness"), mat.roughness));
-		glVerify(glUniform1f(glGetUniformLocation(program, "metallic"), mat.metallic));
-
-		// set material properties
-		if (mat.colorTex)
-		{
-			GLuint tex = mat.colorTex->colorTex;
-
-			glActiveTexture(GL_TEXTURE1);
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, tex);
-
-			glVerify(glUniform1i(glGetUniformLocation(program, "tex"), 1));		// use slot one
-			glVerify(glUniform1i(glGetUniformLocation(program, "texture"), 1)); // enable tex sampling
-		}
-		else
-		{
-			glVerify(glUniform1i(glGetUniformLocation(program, "tex"), 1));		// use slot one
-			glVerify(glUniform1i(glGetUniformLocation(program, "texture"), 0)); // disable tex sampling}
-		}
-	}
-
-	glVerify(glColor3fv(mat.frontColor));
-	glVerify(glSecondaryColor3fv(mat.backColor));
-}
-
 
 void DrawPlanes(Vec4* planes, int n, float bias)
 {
@@ -1118,7 +858,7 @@ void DrawPlanes(Vec4* planes, int n, float bias)
 	}
 
 	glVerify(glUniform1i(uGrid, 0));
-	glVerify(glUniform1f(uBias, g_shadowBias));
+	glVerify(glUniform1f(uBias, gShadowBias));
 }
 
 void DrawMesh(const Mesh* m, Vec3 color)
@@ -1175,8 +915,8 @@ void DrawCloth(const Vec4* positions, const Vec4* normals, const float* uvs, con
 	}
 #endif
 
-	glColor3fv(g_colors[colorIndex+1]*1.5f);
-	glSecondaryColor3fv(g_colors[colorIndex]*1.5f);
+	glColor3fv(gColors[colorIndex+1]*1.5f);
+	glSecondaryColor3fv(gColors[colorIndex]*1.5f);
 
 	glVerify(glBindBuffer(GL_ARRAY_BUFFER, 0));
 	glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
@@ -1199,7 +939,7 @@ void DrawCloth(const Vec4* positions, const Vec4* normals, const float* uvs, con
 	if (program == GLint(s_diffuseProgram))
 	{
 		GLint uBias = glGetUniformLocation(s_diffuseProgram, "bias");
-		glUniform1f(uBias, g_shadowBias);
+		glUniform1f(uBias, gShadowBias);
 
 		GLint uExpand = glGetUniformLocation(s_diffuseProgram, "expand");
 		glUniform1f(uExpand, 0.0f);
@@ -1231,8 +971,8 @@ void DrawRope(Vec4* positions, int* indices, int numIndices, float radius, int c
 	Extrude(&curve[0], int(curve.size()), vertices, normals, triangles, radius, resolution, smoothing);
 		
 	glVerify(glDisable(GL_CULL_FACE));
-	glVerify(glColor3fv(g_colors[color%8]*1.5f));
-	glVerify(glSecondaryColor3fv(g_colors[color%8]*1.5f));
+	glVerify(glColor3fv(gColors[color%8]*1.5f));
+	glVerify(glSecondaryColor3fv(gColors[color%8]*1.5f));
 
 	glVerify(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
@@ -1917,6 +1657,31 @@ void main()
 );
 
 
+struct FluidRenderer
+{
+	GLuint mDepthFbo;
+	GLuint mDepthTex;
+	GLuint mDepthSmoothTex;
+	GLuint mSceneFbo;
+	GLuint mSceneTex;
+	GLuint mReflectTex;
+
+	GLuint mThicknessFbo;
+	GLuint mThicknessTex;
+
+	GLuint mPointThicknessProgram;
+	//GLuint mPointDepthProgram;
+
+	GLuint mEllipsoidThicknessProgram;
+	GLuint mEllipsoidDepthProgram;
+
+	GLuint mCompositeProgram;
+	GLuint mDepthBlurProgram;
+
+	int mSceneWidth;
+	int mSceneHeight;
+};
+
 FluidRenderer* CreateFluidRenderer(uint32_t width, uint32_t height)
 {
 	FluidRenderer* renderer = new FluidRenderer();
@@ -2042,181 +1807,206 @@ void DestroyFluidRenderer(FluidRenderer* renderer)
 	glVerify(glDeleteTextures(1, &renderer->mThicknessTex));
 }
 
-FluidRenderBuffers* CreateFluidRenderBuffers(int numFluidParticles, bool enableInterop)
+FluidRenderBuffers CreateFluidRenderBuffers(int numFluidParticles, bool enableInterop)
 {
-	FluidRenderBuffersGL* buffers = new FluidRenderBuffersGL(numFluidParticles);
-	
+	FluidRenderBuffers buffers = {};
+	buffers.mNumFluidParticles = numFluidParticles;
+
 	// vbos
-	glVerify(glGenBuffers(1, &buffers->mPositionVBO));
-	glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mPositionVBO));
+	glVerify(glGenBuffers(1, &buffers.mPositionVBO));
+	glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mPositionVBO));
 	glVerify(glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * numFluidParticles, 0, GL_DYNAMIC_DRAW));
 
 	// density
-	glVerify(glGenBuffers(1, &buffers->mDensityVBO));
-	glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDensityVBO));
+	glVerify(glGenBuffers(1, &buffers.mDensityVBO));
+	glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDensityVBO));
 	glVerify(glBufferData(GL_ARRAY_BUFFER, sizeof(int)*numFluidParticles, 0, GL_DYNAMIC_DRAW));
 
 	for (int i = 0; i < 3; ++i)
 	{
-		glVerify(glGenBuffers(1, &buffers->mAnisotropyVBO[i]));
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mAnisotropyVBO[i]));
+		glVerify(glGenBuffers(1, &buffers.mAnisotropyVBO[i]));
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[i]));
 		glVerify(glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * numFluidParticles, 0, GL_DYNAMIC_DRAW));
 	}
 
-	glVerify(glGenBuffers(1, &buffers->mIndices));
-	glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers->mIndices));
+	glVerify(glGenBuffers(1, &buffers.mIndices));
+	glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers.mIndices));
 	glVerify(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int)*numFluidParticles, 0, GL_DYNAMIC_DRAW));
 
 	if (enableInterop)
 	{
-		buffers->mPositionBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mPositionVBO, numFluidParticles, sizeof(Vec4));
-		buffers->mDensitiesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mDensityVBO, numFluidParticles, sizeof(float));
-		buffers->mIndicesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mIndices, numFluidParticles, sizeof(int));
+		extern NvFlexLibrary* g_flexLib;
 
-		buffers->mAnisotropyBuf[0] = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mAnisotropyVBO[0], numFluidParticles, sizeof(Vec4));
-		buffers->mAnisotropyBuf[1] = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mAnisotropyVBO[1], numFluidParticles, sizeof(Vec4));
-		buffers->mAnisotropyBuf[2] = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mAnisotropyVBO[2], numFluidParticles, sizeof(Vec4));
+		buffers.mPositionBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mPositionVBO, numFluidParticles, sizeof(Vec4));
+		buffers.mDensitiesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mDensityVBO, numFluidParticles, sizeof(float));
+		buffers.mIndicesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mIndices, numFluidParticles, sizeof(int));
+
+		buffers.mAnisotropyBuf[0] = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mAnisotropyVBO[0], numFluidParticles, sizeof(Vec4));
+		buffers.mAnisotropyBuf[1] = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mAnisotropyVBO[1], numFluidParticles, sizeof(Vec4));
+		buffers.mAnisotropyBuf[2] = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mAnisotropyVBO[2], numFluidParticles, sizeof(Vec4));
 	}
 
-	return reinterpret_cast<FluidRenderBuffers*>(buffers);
+	return buffers;
 }
 
-void DestroyFluidRenderBuffers(FluidRenderBuffers* buffers)
+void DestroyFluidRenderBuffers(FluidRenderBuffers buffers)
 {
-	delete reinterpret_cast<FluidRenderBuffersGL*>(buffers);
+	glDeleteBuffers(1, &buffers.mPositionVBO);
+	glDeleteBuffers(3, buffers.mAnisotropyVBO);
+	glDeleteBuffers(1, &buffers.mDensityVBO);
+	glDeleteBuffers(1, &buffers.mIndices);
+
+	NvFlexUnregisterOGLBuffer(buffers.mPositionBuf);
+	NvFlexUnregisterOGLBuffer(buffers.mDensitiesBuf);
+	NvFlexUnregisterOGLBuffer(buffers.mIndicesBuf);
+
+	NvFlexUnregisterOGLBuffer(buffers.mAnisotropyBuf[0]);
+	NvFlexUnregisterOGLBuffer(buffers.mAnisotropyBuf[1]);
+	NvFlexUnregisterOGLBuffer(buffers.mAnisotropyBuf[2]);
 }
 
-void UpdateFluidRenderBuffers(FluidRenderBuffers* buffersIn, NvFlexSolver* solver, bool anisotropy, bool density)
+void UpdateFluidRenderBuffers(FluidRenderBuffers buffers, NvFlexSolver* solver, bool anisotropy, bool density)
 {
-	FluidRenderBuffersGL* buffers = reinterpret_cast<FluidRenderBuffersGL*>(buffersIn);
 	// use VBO buffer wrappers to allow Flex to write directly to the OpenGL buffers
 	// Flex will take care of any CUDA interop mapping/unmapping during the get() operations
 	if (!anisotropy)
 	{
 		// regular particles
-		NvFlexGetParticles(solver, buffers->mPositionBuf, NULL);
+		NvFlexGetParticles(solver, buffers.mPositionBuf, buffers.mNumFluidParticles);
 	}
 	else
 	{
 		// fluid buffers
-		NvFlexGetSmoothParticles(solver, buffers->mPositionBuf, NULL);
-		NvFlexGetAnisotropy(solver, buffers->mAnisotropyBuf[0], buffers->mAnisotropyBuf[1], buffers->mAnisotropyBuf[2], NULL);
+		NvFlexGetSmoothParticles(solver, buffers.mPositionBuf, buffers.mNumFluidParticles);
+		NvFlexGetAnisotropy(solver, buffers.mAnisotropyBuf[0], buffers.mAnisotropyBuf[1], buffers.mAnisotropyBuf[2]);
 	}
 
 	if (density)
 	{
-		NvFlexGetDensities(solver, buffers->mDensitiesBuf, NULL);
+		NvFlexGetDensities(solver, buffers.mDensitiesBuf, buffers.mNumFluidParticles);
 	}
 	else
 	{
-		NvFlexGetPhases(solver, buffers->mDensitiesBuf, NULL);
+		NvFlexGetPhases(solver, buffers.mDensitiesBuf, buffers.mNumFluidParticles);
 	}
 
-	NvFlexGetActive(solver, buffers->mIndicesBuf, NULL);
+	NvFlexGetActive(solver, buffers.mIndicesBuf);
 }
 
-void UpdateFluidRenderBuffers(FluidRenderBuffers* buffersIn, Vec4* particles, float* densities, Vec4* anisotropy1, Vec4* anisotropy2, Vec4* anisotropy3, int numParticles, int* indices, int numIndices)
+void UpdateFluidRenderBuffers(FluidRenderBuffers buffers, Vec4* particles, float* densities, Vec4* anisotropy1, Vec4* anisotropy2, Vec4* anisotropy3, int numParticles, int* indices, int numIndices)
 {
-	FluidRenderBuffersGL* buffers = reinterpret_cast<FluidRenderBuffersGL*>(buffersIn);
 	// regular particles
-	glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mPositionVBO));
-	glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers->mNumParticles*sizeof(Vec4), particles));
+	glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mPositionVBO));
+	glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumFluidParticles*sizeof(Vec4), particles));
 
-	Vec4*const anisotropies[] = 
+	if (anisotropy1)
 	{
-		anisotropy1,
-		anisotropy2, 
-		anisotropy3,
-	};
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[0]));
+		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumFluidParticles*sizeof(Vec4), anisotropy1));
+	}
 
-	for (int i = 0; i < 3; i++)
+	if (anisotropy2)
 	{
-		Vec4* anisotropy = anisotropies[i];
-		if (anisotropy)
-		{
-			glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mAnisotropyVBO[i]));
-			glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers->mNumParticles * sizeof(Vec4), anisotropy));
-		}
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[1]));
+		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumFluidParticles*sizeof(Vec4), anisotropy2));
+	}
+
+	if (anisotropy3)
+	{
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[2]));
+		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumFluidParticles*sizeof(Vec4), anisotropy3));
 	}
 
 	// density /phase buffer
 	if (densities)
 	{
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDensityVBO));
-		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers->mNumParticles*sizeof(float), densities));
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDensityVBO));
+		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumFluidParticles*sizeof(float), densities));
 	}
 
 	if (indices)
 	{
-		glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers->mIndices));
+		glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers.mIndices));
 		glVerify(glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, numIndices*sizeof(int), indices));
 	}
 
 	// reset
 	glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 	glVerify(glBindBuffer(GL_ARRAY_BUFFER, 0));
+
 }
 
-DiffuseRenderBuffers* CreateDiffuseRenderBuffers(int numDiffuseParticles, bool& enableInterop)
+DiffuseRenderBuffers CreateDiffuseRenderBuffers(int numDiffuseParticles, bool& enableInterop)
 {
-	DiffuseRenderBuffersGL* buffers = new DiffuseRenderBuffersGL(numDiffuseParticles);
-	
+	DiffuseRenderBuffers buffers = {};
+	buffers.mNumDiffuseParticles = numDiffuseParticles;
+
 	if (numDiffuseParticles > 0)
 	{
-		glVerify(glGenBuffers(1, &buffers->mDiffusePositionVBO));
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDiffusePositionVBO));
+		glVerify(glGenBuffers(1, &buffers.mDiffusePositionVBO));
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDiffusePositionVBO));
 		glVerify(glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * numDiffuseParticles, 0, GL_DYNAMIC_DRAW));
 		glVerify(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
-		glVerify(glGenBuffers(1, &buffers->mDiffuseVelocityVBO));
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDiffuseVelocityVBO));
+		glVerify(glGenBuffers(1, &buffers.mDiffuseVelocityVBO));
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDiffuseVelocityVBO));
 		glVerify(glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * numDiffuseParticles, 0, GL_DYNAMIC_DRAW));
 		glVerify(glBindBuffer(GL_ARRAY_BUFFER, 0));
+
+		glVerify(glGenBuffers(1, &buffers.mDiffuseIndicesIBO));
+		glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers.mDiffuseIndicesIBO));
+		glVerify(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int)*numDiffuseParticles, 0, GL_DYNAMIC_DRAW));
+		glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 
 		if (enableInterop)
 		{
-			buffers->mDiffusePositionsBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mDiffusePositionVBO, numDiffuseParticles, sizeof(Vec4));
-			buffers->mDiffuseVelocitiesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers->mDiffuseVelocityVBO, numDiffuseParticles, sizeof(Vec4));
+			extern NvFlexLibrary* g_flexLib;
+
+			buffers.mDiffuseIndicesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mDiffuseIndicesIBO, numDiffuseParticles, sizeof(int));
+			buffers.mDiffusePositionsBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mDiffusePositionVBO, numDiffuseParticles, sizeof(Vec4));
+			buffers.mDiffuseVelocitiesBuf = NvFlexRegisterOGLBuffer(g_flexLib, buffers.mDiffuseVelocityVBO, numDiffuseParticles, sizeof(Vec4));
 		}
 	}
 
-	return reinterpret_cast<DiffuseRenderBuffers*>(buffers);
+	return buffers;
 }
 
-void DestroyDiffuseRenderBuffers(DiffuseRenderBuffers* buffersIn)
+void DestroyDiffuseRenderBuffers(DiffuseRenderBuffers buffers)
 {
-	DiffuseRenderBuffersGL* buffers = reinterpret_cast<DiffuseRenderBuffersGL*>(buffersIn);
-	if (buffers->mNumParticles > 0)
+	if (buffers.mNumDiffuseParticles > 0)
 	{
-		glDeleteBuffers(1, &buffers->mDiffusePositionVBO);
-		glDeleteBuffers(1, &buffers->mDiffuseVelocityVBO);
+		glDeleteBuffers(1, &buffers.mDiffusePositionVBO);
+		glDeleteBuffers(1, &buffers.mDiffuseVelocityVBO);
+		glDeleteBuffers(1, &buffers.mDiffuseIndicesIBO);
 
-		NvFlexUnregisterOGLBuffer(buffers->mDiffusePositionsBuf);
-		NvFlexUnregisterOGLBuffer(buffers->mDiffuseVelocitiesBuf);
+		NvFlexUnregisterOGLBuffer(buffers.mDiffuseIndicesBuf);
+		NvFlexUnregisterOGLBuffer(buffers.mDiffusePositionsBuf);
+		NvFlexUnregisterOGLBuffer(buffers.mDiffuseVelocitiesBuf);
 	}
 }
 
-void UpdateDiffuseRenderBuffers(DiffuseRenderBuffers* buffersIn, NvFlexSolver* solver)
+void UpdateDiffuseRenderBuffers(DiffuseRenderBuffers buffers, NvFlexSolver* solver)
 {
-	DiffuseRenderBuffersGL* buffers = reinterpret_cast<DiffuseRenderBuffersGL*>(buffersIn);
 	// diffuse particles
-	if (buffers->mNumParticles)
+	if (buffers.mNumDiffuseParticles)
 	{
-		NvFlexGetDiffuseParticles(solver, buffers->mDiffusePositionsBuf, buffers->mDiffuseVelocitiesBuf, NULL);
+		NvFlexGetDiffuseParticles(solver, buffers.mDiffusePositionsBuf, buffers.mDiffuseVelocitiesBuf, buffers.mDiffuseIndicesBuf);
 	}
 }
 
-void UpdateDiffuseRenderBuffers(DiffuseRenderBuffers* buffersIn, Vec4* diffusePositions, Vec4* diffuseVelocities, int numDiffuseParticles)
+void UpdateDiffuseRenderBuffers(DiffuseRenderBuffers buffers, Vec4* diffusePositions, Vec4* diffuseVelocities, int* diffuseIndices, int numDiffuseParticles)
 {
-	DiffuseRenderBuffersGL* buffers = reinterpret_cast<DiffuseRenderBuffersGL*>(buffersIn);
 	// diffuse particles
-	if (buffers->mNumParticles)
+	if (buffers.mNumDiffuseParticles)
 	{
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDiffusePositionVBO));
-		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers->mNumParticles*sizeof(Vec4), diffusePositions));
+		glVerify(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers.mDiffuseIndicesIBO));
+		glVerify(glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, buffers.mNumDiffuseParticles*sizeof(int), diffuseIndices));
 
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDiffuseVelocityVBO));
-		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers->mNumParticles*sizeof(Vec4), diffuseVelocities));
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDiffusePositionVBO));
+		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumDiffuseParticles*sizeof(Vec4), diffusePositions));
+
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDiffuseVelocityVBO));
+		glVerify(glBufferSubData(GL_ARRAY_BUFFER, 0, buffers.mNumDiffuseParticles*sizeof(Vec4), diffuseVelocities));
 	}
 }
 
@@ -2240,10 +2030,11 @@ void RenderFullscreenQuad()
 	glEnd();
 }
 
-void RenderEllipsoids(FluidRenderer* render, FluidRenderBuffers* buffersIn, int n, int offset, float radius, float screenWidth, float screenAspect, float fov, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ShadowMap* shadowMap, Vec4 color, float blur, float ior, bool debug)
-{
-	FluidRenderBuffersGL* buffers = reinterpret_cast<FluidRenderBuffersGL*>(buffersIn);
+extern Mesh* g_mesh;
+void DrawShapes();
 
+void RenderEllipsoids(FluidRenderer* render, FluidRenderBuffers buffers, int n, int offset, float radius, float screenWidth, float screenAspect, float fov, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ShadowMap* shadowMap, Vec4 color, float blur, float ior, bool debug)
+{
 #if !ENABLE_SIMPLE_FLUID
 	// resolve msaa back buffer to texture
 	glVerify(glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, g_msaaFbo));
@@ -2263,7 +2054,7 @@ void RenderEllipsoids(FluidRenderer* render, FluidRenderBuffers* buffersIn, int 
 	glDisable(GL_CULL_FACE);
 
 	if (g_mesh)
-		OGL_Renderer::DrawMesh(g_mesh, Vec3(1.0f));
+		DrawMesh(g_mesh, Vec3(1.0f));
 
 	DrawShapes();
 
@@ -2285,7 +2076,7 @@ void RenderEllipsoids(FluidRenderer* render, FluidRenderBuffers* buffersIn, int 
 	glUniform1f( glGetUniformLocation(render->mPointThicknessProgram, "pointScale"), screenWidth/screenAspect * (1.0f / (tanf(fov*0.5f))));
 
 	glEnableClientState(GL_VERTEX_ARRAY);			
-	glBindBuffer(GL_ARRAY_BUFFER, buffers->mPositionVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, buffers.mPositionVBO);
 	glVertexPointer(3, GL_FLOAT, sizeof(float)*4, (void*)(offset*sizeof(float)*4));
 
 	glDrawArrays(GL_POINTS, 0, n);
@@ -2319,23 +2110,23 @@ void RenderEllipsoids(FluidRenderer* render, FluidRenderBuffers* buffersIn, int 
 	glUniform3fv( glGetUniformLocation(render->mEllipsoidDepthProgram, "invProjection"), 1, Vec3(screenAspect*viewHeight, viewHeight, 1.0f));
 
 	glEnableClientState(GL_VERTEX_ARRAY);
-	glBindBuffer(GL_ARRAY_BUFFER, buffers->mPositionVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, buffers.mPositionVBO);
 	glVertexPointer(3, GL_FLOAT, sizeof(float)*4, 0);//(void*)(offset*sizeof(float)*4));
 
 	// ellipsoid eigenvectors
 	int s1 = glGetAttribLocation(render->mEllipsoidDepthProgram, "q1");
 	glEnableVertexAttribArray(s1);
-	glBindBuffer(GL_ARRAY_BUFFER, buffers->mAnisotropyVBO[0]);
+	glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[0]);
 	glVertexAttribPointer(s1, 4, GL_FLOAT, GL_FALSE, 0, 0);// (void*)(offset*sizeof(float)*4));
 
 	int s2 = glGetAttribLocation(render->mEllipsoidDepthProgram, "q2");
 	glEnableVertexAttribArray(s2);
-	glBindBuffer(GL_ARRAY_BUFFER, buffers->mAnisotropyVBO[1]);
+	glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[1]);
 	glVertexAttribPointer(s2, 4, GL_FLOAT, GL_FALSE, 0, 0);//(void*)(offset*sizeof(float)*4));
 
 	int s3 = glGetAttribLocation(render->mEllipsoidDepthProgram, "q3");
 	glEnableVertexAttribArray(s3);
-	glBindBuffer(GL_ARRAY_BUFFER, buffers->mAnisotropyVBO[2]);
+	glBindBuffer(GL_ARRAY_BUFFER, buffers.mAnisotropyVBO[2]);
 	glVertexAttribPointer(s3, 4, GL_FLOAT, GL_FALSE, 0, 0);// (void*)(offset*sizeof(float)*4));
 	
 	glVerify(glDrawArrays(GL_POINTS, offset, n));
@@ -2394,8 +2185,8 @@ void RenderEllipsoids(FluidRenderer* render, FluidRenderBuffers* buffersIn, int 
 	glVerify(glUniform2fv(glGetUniformLocation(render->mCompositeProgram, "clipPosToEye"), 1, Vec2(tanf(fov*0.5f)*screenAspect, tanf(fov*0.5f))));
 	glVerify(glUniform4fv(glGetUniformLocation(render->mCompositeProgram, "color"), 1, color));
 	glVerify(glUniform1f(glGetUniformLocation(render->mCompositeProgram, "ior"),  ior));
-	glVerify(glUniform1f(glGetUniformLocation(render->mCompositeProgram, "spotMin"), g_spotMin));
-	glVerify(glUniform1f(glGetUniformLocation(render->mCompositeProgram, "spotMax"), g_spotMax));
+	glVerify(glUniform1f(glGetUniformLocation(render->mCompositeProgram, "spotMin"), gSpotMin));
+	glVerify(glUniform1f(glGetUniformLocation(render->mCompositeProgram, "spotMax"), gSpotMax));
 	glVerify(glUniform1i(glGetUniformLocation(render->mCompositeProgram, "debug"), debug));
 
 	glVerify(glUniform3fv(glGetUniformLocation(render->mCompositeProgram, "lightPos"), 1, lightPos));
@@ -2567,6 +2358,7 @@ void main()
 	}	
 	
 	{
+		
 		gl_TexCoord[1] = gl_TexCoordIn[0][1];	// vertex world pos (life in w)
 		gl_TexCoord[2] = gl_TexCoordIn[0][2];	// vertex eye pos
 		gl_TexCoord[3] = gl_TexCoordIn[0][3];	// vertex velocity in view space
@@ -2639,14 +2431,8 @@ void main()
 }
 );
 
-int GetNumDiffuseRenderParticles(DiffuseRenderBuffers* buffers)
+void RenderDiffuse(FluidRenderer* render, DiffuseRenderBuffers buffers, int n, float radius, float screenWidth, float screenAspect, float fov, Vec4 color, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ShadowMap* shadowMap, float motionBlur, float inscatter, float outscatter, bool shadow, bool front)
 {
-	return reinterpret_cast<DiffuseRenderBuffersGL*>(buffers)->mNumParticles;
-}
-
-void RenderDiffuse(FluidRenderer* render, DiffuseRenderBuffers* buffersIn, int n, float radius, float screenWidth, float screenAspect, float fov, Vec4 color, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ShadowMap* shadowMap, float motionBlur, float inscatter, float outscatter, bool shadow, bool front)
-{
-	DiffuseRenderBuffersGL* buffers = reinterpret_cast<DiffuseRenderBuffersGL*>(buffersIn);
 	static int sprogram = -1;
 	if (sprogram == -1)
 		sprogram = CompileProgram(vertexDiffuseShader, fragmentDiffuseShader, geometryDiffuseShader);
@@ -2675,6 +2461,7 @@ void RenderDiffuse(FluidRenderer* render, DiffuseRenderBuffers* buffersIn, int n
 		glEnable(GL_BLEND);
 		glDisable(GL_CULL_FACE);
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
 		
 		glUseProgram(sprogram);
 		glUniform1f( glGetUniformLocation(sprogram, "motionBlurScale"), motionBlur);
@@ -2696,8 +2483,8 @@ void RenderDiffuse(FluidRenderer* render, DiffuseRenderBuffers* buffersIn, int n
 		GLint uLightDir = glGetUniformLocation(sprogram, "lightDir");
 		glUniform3fv(uLightDir, 1, Normalize(lightTarget-lightPos));
 
-		glUniform1f( glGetUniformLocation(sprogram, "spotMin"), g_spotMin);
-		glUniform1f( glGetUniformLocation(sprogram, "spotMax"), g_spotMax);
+		glUniform1f( glGetUniformLocation(sprogram, "spotMin"), gSpotMin);
+		glUniform1f( glGetUniformLocation(sprogram, "spotMax"), gSpotMax);
 
 		const Vec2 taps[] = 
 		{ 
@@ -2735,16 +2522,16 @@ void RenderDiffuse(FluidRenderer* render, DiffuseRenderBuffers* buffersIn, int n
 
 		glClientActiveTexture(GL_TEXTURE1);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers->mDiffuseVelocityVBO));
+		glVerify(glBindBuffer(GL_ARRAY_BUFFER, buffers.mDiffuseVelocityVBO));
 		glTexCoordPointer(4, GL_FLOAT, sizeof(float)*4, 0);
 
 		glEnableClientState(GL_VERTEX_ARRAY);			
-		glBindBuffer(GL_ARRAY_BUFFER, buffers->mDiffusePositionVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, buffers.mDiffusePositionVBO);
 		glVertexPointer(4, GL_FLOAT, sizeof(float)*4, 0);
 
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers.mDiffuseIndicesIBO);
 
-		glDrawArrays(GL_POINTS, 0, n);
+		glDrawElements(GL_POINTS, n, GL_UNSIGNED_INT, 0);
 
 		glUseProgram(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -2804,6 +2591,17 @@ void RenderDiffuse(FluidRenderer* render, DiffuseRenderBuffers* buffersIn, int n
 
 	}
 }
+
+
+struct GpuMesh
+{
+	GLuint mPositionsVBO;
+	GLuint mNormalsVBO;
+	GLuint mIndicesIBO;
+
+	int mNumVertices;
+	int mNumFaces;
+};
 
 GpuMesh* CreateGpuMesh(const Mesh* m)
 {
@@ -2972,295 +2770,3 @@ void EndPoints()
 	glEnd();
 }
 
-float SyncAndGetRenderTime(unsigned long long* begin, unsigned long long* end, unsigned long long* freq)
-{
-	*begin = 0;
-	*end = 0;
-	*freq = 1;
-	return 0.0f;
-}
-
-float RendererGetDeviceTimestamps(unsigned long long* begin, unsigned long long* end, unsigned long long* freq) { return 0.0f; }
-void* GetGraphicsCommandQueue() { return nullptr; } 
-void GraphicsTimerBegin() { }
-void GraphicsTimerEnd() { }
-
-void StartGpuWork() { }
-void EndGpuWork() { }
-
-void GetRenderDevice(void** deviceOut, void** contextOut) 
-{ 
-	*deviceOut = nullptr;
-	*contextOut = nullptr;
-}
-
-void DrawImguiGraph()
-{
-	imguiGraphDraw();
-}
-
-}	// OGL Renderer
-
-
-#include "../demoContext.h"
-#include "demoContextOGL.h"
-
-DemoContext* CreateDemoContextOGL()
-{
-	return new DemoContextOGL;
-}
-
-bool DemoContextOGL::initialize(const RenderInitOptions& options)
-{
-	OGL_Renderer::InitRender(options);
-	return true;
-}
-
-void DemoContextOGL::startFrame(Vec4 colorIn)
-{
-	OGL_Renderer::StartFrame(colorIn);
-}
-
-void DemoContextOGL::endFrame()
-{
-	OGL_Renderer::EndFrame();
-}
-
-void DemoContextOGL::presentFrame(bool fullsync)
-{
-	OGL_Renderer::PresentFrame(fullsync);
-}
-
-void DemoContextOGL::readFrame(int* buffer, int width, int height)
-{
-	OGL_Renderer::ReadFrame(buffer, width, height);
-}
-
-void DemoContextOGL::getViewRay(int x, int y, Vec3& origin, Vec3& dir)
-{
-	OGL_Renderer::GetViewRay(x, y, origin, dir);
-}
-
-void DemoContextOGL::setView(Matrix44 view, Matrix44 projection)
-{
-	OGL_Renderer::SetView(view, projection);
-}
-
-void DemoContextOGL::renderEllipsoids(FluidRenderer* renderer, FluidRenderBuffers* buffers, int n, int offset, float radius, float screenWidth, float screenAspect, float fov, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ::ShadowMap* shadowMap, Vec4 color, float blur, float ior, bool debug)
-{
-	OGL_Renderer::RenderEllipsoids(renderer, buffers, n, offset, radius, screenWidth, screenAspect, fov, lightPos, lightTarget, lightTransform, shadowMap, color, blur, ior, debug);
-}
-
-void DemoContextOGL::drawMesh(const Mesh* m, Vec3 color)
-{
-	OGL_Renderer::DrawMesh(m, color);
-}
-
-void DemoContextOGL::drawCloth(const Vec4* positions, const Vec4* normals, const float* uvs, const int* indices, int numTris, int numPositions, int colorIndex, float expand, bool twosided, bool smooth)
-{
-	OGL_Renderer::DrawCloth(positions, normals, uvs, indices, numTris, numPositions, colorIndex, expand, twosided, smooth);
-}
-
-void DemoContextOGL::drawRope(Vec4* positions, int* indices, int numIndices, float radius, int color)
-{
-	OGL_Renderer::DrawRope(positions, indices, numIndices, radius, color);
-}
-
-void DemoContextOGL::drawPlane(const Vec4& p, bool color)
-{
-	OGL_Renderer::DrawPlane(p, color);
-}
-
-void DemoContextOGL::drawPlanes(Vec4* planes, int n, float bias)
-{
-	OGL_Renderer::DrawPlanes(planes, n, bias);
-}
-
-void DemoContextOGL::drawPoints(FluidRenderBuffers* buffers, int n, int offset, float radius, float screenWidth, float screenAspect, float fov, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ::ShadowMap* shadowTex, bool showDensity)
-{
-	OGL_Renderer::DrawPoints(buffers, n, offset, radius, screenWidth, screenAspect, fov, lightPos, lightTarget, lightTransform, shadowTex, showDensity);
-}
-
-void DemoContextOGL::graphicsTimerBegin()
-{
-	OGL_Renderer::GraphicsTimerBegin();
-}
-
-void DemoContextOGL::graphicsTimerEnd()
-{
-	OGL_Renderer::GraphicsTimerEnd();
-}
-
-float DemoContextOGL::rendererGetDeviceTimestamps(unsigned long long* begin, unsigned long long* end, unsigned long long* freq)
-{
-	return OGL_Renderer::RendererGetDeviceTimestamps(begin, end, freq);
-}
-
-void DemoContextOGL::bindSolidShader(Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ::ShadowMap* shadowMap, float bias, Vec4 fogColor)
-{
-	OGL_Renderer::BindSolidShader(lightPos, lightTarget, lightTransform, shadowMap, bias, fogColor);
-}
-
-void DemoContextOGL::unbindSolidShader()
-{
-	OGL_Renderer::UnbindSolidShader();
-}
-
-ShadowMap* DemoContextOGL::shadowCreate()
-{
-	return OGL_Renderer::ShadowCreate();
-}
-
-void DemoContextOGL::shadowDestroy(ShadowMap* map)
-{
-	OGL_Renderer::ShadowDestroy(map);
-}
-
-void DemoContextOGL::shadowBegin(ShadowMap* map)
-{
-	OGL_Renderer::ShadowBegin(map);
-}
-
-void DemoContextOGL::shadowEnd()
-{
-	OGL_Renderer::ShadowEnd();
-}
-
-FluidRenderer* DemoContextOGL::createFluidRenderer(uint32_t width, uint32_t height)
-{
-	return OGL_Renderer::CreateFluidRenderer(width, height);
-}
-
-void DemoContextOGL::destroyFluidRenderer(FluidRenderer* renderer)
-{
-	OGL_Renderer::DestroyFluidRenderer(renderer);
-}
-
-FluidRenderBuffers* DemoContextOGL::createFluidRenderBuffers(int numParticles, bool enableInterop)
-{
-	return OGL_Renderer::CreateFluidRenderBuffers(numParticles, enableInterop);
-}
-
-void DemoContextOGL::updateFluidRenderBuffers(FluidRenderBuffers* buffers, NvFlexSolver* flex, bool anisotropy, bool density)
-{
-	OGL_Renderer::UpdateFluidRenderBuffers(buffers, flex, anisotropy, density);
-}
-
-void DemoContextOGL::updateFluidRenderBuffers(FluidRenderBuffers* buffers, Vec4* particles, float* densities, Vec4* anisotropy1, Vec4* anisotropy2, Vec4* anisotropy3, int numParticles, int* indices, int numIndices)
-{
-	OGL_Renderer::UpdateFluidRenderBuffers(buffers, particles, densities, anisotropy1, anisotropy2, anisotropy3, numParticles, indices, numIndices);
-}
-
-void DemoContextOGL::destroyFluidRenderBuffers(FluidRenderBuffers* buffers)
-{
-	OGL_Renderer::DestroyFluidRenderBuffers(buffers);
-}
-
-GpuMesh* DemoContextOGL::createGpuMesh(const Mesh* m)
-{
-	return OGL_Renderer::CreateGpuMesh(m);
-}
-
-void DemoContextOGL::destroyGpuMesh(GpuMesh* mesh)
-{
-	OGL_Renderer::DestroyGpuMesh(mesh);
-}
-
-void DemoContextOGL::drawGpuMesh(GpuMesh* m, const Matrix44& xform, const Vec3& color)
-{
-	OGL_Renderer::DrawGpuMesh(m, xform, color);
-}
-
-void DemoContextOGL::drawGpuMeshInstances(GpuMesh* m, const Matrix44* xforms, int n, const Vec3& color)
-{
-	OGL_Renderer::DrawGpuMeshInstances(m, xforms, n, color);
-}
-
-DiffuseRenderBuffers* DemoContextOGL::createDiffuseRenderBuffers(int numDiffuseParticles, bool& enableInterop)
-{
-	return OGL_Renderer::CreateDiffuseRenderBuffers(numDiffuseParticles, enableInterop);
-}
-
-void DemoContextOGL::destroyDiffuseRenderBuffers(DiffuseRenderBuffers* buffers)
-{
-	OGL_Renderer::DestroyDiffuseRenderBuffers(buffers);
-}
-
-void DemoContextOGL::updateDiffuseRenderBuffers(DiffuseRenderBuffers* buffers, Vec4* diffusePositions, Vec4* diffuseVelocities, int numDiffuseParticles)
-{
-	OGL_Renderer::UpdateDiffuseRenderBuffers(buffers, diffusePositions, diffuseVelocities, numDiffuseParticles);
-}
-
-void DemoContextOGL::updateDiffuseRenderBuffers(DiffuseRenderBuffers* buffers, NvFlexSolver* solver)
-{
-	OGL_Renderer::UpdateDiffuseRenderBuffers(buffers, solver);
-}
-
-void DemoContextOGL::drawDiffuse(FluidRenderer* render, const DiffuseRenderBuffers* buffers, int n, float radius, float screenWidth, float screenAspect, float fov, Vec4 color, Vec3 lightPos, Vec3 lightTarget, Matrix44 lightTransform, ::ShadowMap* shadowMap, float motionBlur, float inscatter, float outscatter, bool shadowEnabled, bool front)
-{
-	OGL_Renderer::RenderDiffuse(render, (DiffuseRenderBuffers*)buffers, n, radius, screenWidth, screenAspect, fov, color, lightPos, lightTarget, lightTransform, shadowMap, motionBlur, inscatter, outscatter, shadowEnabled, front);
-}
-
-int DemoContextOGL::getNumDiffuseRenderParticles(DiffuseRenderBuffers* buffers)
-{
-	return OGL_Renderer::GetNumDiffuseRenderParticles(buffers);
-}
-
-void DemoContextOGL::beginLines()
-{
-	OGL_Renderer::BeginLines();
-}
-
-void DemoContextOGL::drawLine(const Vec3& p, const Vec3& q, const Vec4& color)
-{
-	OGL_Renderer::DrawLine(p, q, color);
-}
-
-void DemoContextOGL::endLines()
-{
-	OGL_Renderer::EndLines();
-}
-
-void DemoContextOGL::onSizeChanged(int width, int height, bool minimized)
-{
-	OGL_Renderer::ReshapeRender(width, height, minimized);
-}
-
-void DemoContextOGL::startGpuWork()
-{
-	OGL_Renderer::StartGpuWork();
-}
-
-void DemoContextOGL::endGpuWork()
-{
-	OGL_Renderer::EndGpuWork();
-}
-
-void DemoContextOGL::flushGraphicsAndWait()
-{
-}
-
-void DemoContextOGL::setFillMode(bool wire)
-{
-	OGL_Renderer::SetFillMode(wire);
-}
-
-void DemoContextOGL::setCullMode(bool enabled)
-{
-	OGL_Renderer::SetCullMode(enabled);
-}
-
-void DemoContextOGL::drawImguiGraph()
-{
-	OGL_Renderer::DrawImguiGraph();
-}
-
-void* DemoContextOGL::getGraphicsCommandQueue()
-{
-	return OGL_Renderer::GetGraphicsCommandQueue();
-}
-
-void DemoContextOGL::getRenderDevice(void** device, void** context)
-{
-	OGL_Renderer::GetRenderDevice(device, context);
-}
